@@ -9,6 +9,6 @@ import com.bardales.intercambiolibrosapi.entity.Categoria;
 
 public interface CategoriaRepository extends JpaRepository<Categoria, Integer> {
 
-    @Query(value = "CALL sp_listar_categorias()", nativeQuery = true)
+    @Query(value = "SELECT c.id_categoria, c.nombre FROM categoria c ORDER BY c.nombre ASC", nativeQuery = true)
     List<Categoria> listarCategorias();
 }

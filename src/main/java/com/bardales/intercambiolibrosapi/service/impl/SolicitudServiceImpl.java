@@ -3,6 +3,7 @@ package com.bardales.intercambiolibrosapi.service.impl;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,15 +17,19 @@ import com.bardales.intercambiolibrosapi.service.SolicitudService;
 public class SolicitudServiceImpl implements SolicitudService {
 
     private final SolicitudRepository solicitudRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public SolicitudServiceImpl(SolicitudRepository solicitudRepository) {
+    public SolicitudServiceImpl(SolicitudRepository solicitudRepository, JdbcTemplate jdbcTemplate) {
         this.solicitudRepository = solicitudRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     @Transactional
     public Integer registrarSolicitud(SolicitudCrearDTO dto) {
-        Integer idSolicitud = solicitudRepository.crearSolicitud(
+        Integer idSolicitud = jdbcTemplate.queryForObject(
+                "INSERT INTO solicitud (id_solicitante, id_receptor, tipo, estado) VALUES (?, ?, ?, 'pendiente') RETURNING id_solicitud",
+                Integer.class,
                 dto.getIdSolicitante(),
                 dto.getIdReceptor(),
                 dto.getTipo());

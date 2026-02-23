@@ -3,6 +3,7 @@ package com.bardales.intercambiolibrosapi.service.impl;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +25,13 @@ public class IntercambioServiceImpl implements IntercambioService {
 
     private final IntercambioJpaRepository intercambioRepository;
     private final LibroRepository libroRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public IntercambioServiceImpl(IntercambioJpaRepository intercambioRepository, LibroRepository libroRepository) {
+    public IntercambioServiceImpl(IntercambioJpaRepository intercambioRepository, LibroRepository libroRepository,
+            JdbcTemplate jdbcTemplate) {
         this.intercambioRepository = intercambioRepository;
         this.libroRepository = libroRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -44,13 +48,24 @@ public class IntercambioServiceImpl implements IntercambioService {
             throw new UnauthorizedException("El libro no está disponible");
         }
 
-        Integer idSolicitud = intercambioRepository.crearSolicitudIntercambio(
+        Integer idSolicitud = jdbcTemplate.queryForObject(
+                "INSERT INTO solicitud (id_solicitante, id_receptor, tipo, estado) VALUES (?, ?, 'intercambio', 'pendiente') RETURNING id_solicitud",
+                Integer.class,
                 idUsuarioSolicitante,
-                dto.getIdLibroInteresado(),
-                dto.getMensajePropuesta());
+                libro.getIdUsuario());
 
         if (idSolicitud == null || idSolicitud <= 0) {
             throw new RuntimeException("No se pudo crear la solicitud de intercambio");
+        }
+
+        jdbcTemplate.update(
+                "INSERT INTO detalle_solicitud (id_solicitud, id_libro, propietario) VALUES (?, ?, 'receptor')",
+                idSolicitud, dto.getIdLibroInteresado());
+
+        if (dto.getMensajePropuesta() != null && !dto.getMensajePropuesta().isBlank()) {
+            jdbcTemplate.update(
+                    "INSERT INTO mensaje (id_solicitud, id_emisor, contenido) VALUES (?, ?, ?)",
+                    idSolicitud, idUsuarioSolicitante, dto.getMensajePropuesta().trim());
         }
 
         return idSolicitud;
@@ -72,7 +87,33 @@ public class IntercambioServiceImpl implements IntercambioService {
             throw new UnauthorizedException("Estado inválido");
         }
 
-        intercambioRepository.responderSolicitud(idSolicitud, estado, dto.getComentario());
+        String estadoDb = "ACEPTADA".equals(estado) ? "aceptado" : "rechazado";
+
+        jdbcTemplate.update(
+                "UPDATE solicitud SET estado = ? WHERE id_solicitud = ?",
+                estadoDb, idSolicitud);
+
+        if ("aceptado".equals(estadoDb)) {
+            jdbcTemplate.update(
+                    "UPDATE libro l SET disponible = FALSE "
+                            +
+                            "FROM detalle_solicitud ds "
+                            +
+                            "WHERE ds.id_solicitud = ? AND ds.propietario = 'receptor' AND ds.id_libro = l.id_libro",
+                    idSolicitud);
+        }
+
+        if (dto.getComentario() != null && !dto.getComentario().isBlank()) {
+            Integer idReceptor = jdbcTemplate.queryForObject(
+                    "SELECT id_receptor FROM solicitud WHERE id_solicitud = ?",
+                    Integer.class,
+                    idSolicitud);
+            if (idReceptor != null) {
+                jdbcTemplate.update(
+                        "INSERT INTO mensaje (id_solicitud, id_emisor, contenido) VALUES (?, ?, ?)",
+                        idSolicitud, idReceptor, dto.getComentario().trim());
+            }
+        }
     }
 
     @Override

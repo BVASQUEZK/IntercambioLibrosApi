@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -92,16 +93,18 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public Map<String, Object> registrarUsuario(String nombres, String apellidos, String correo, String clave, String dni) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "CALL sp_registrar_usuario_app(?, ?, ?, ?, ?)", nombres, apellidos, correo, clave, dni);
-        if (rows.isEmpty()) {
-            throw new ResourceNotFoundException("No se pudo registrar el usuario");
+        try {
+            Integer idUsuario = jdbcTemplate.queryForObject(
+                    "INSERT INTO usuario (nombres, apellidos, correo, password, dni) VALUES (?, ?, ?, ?, ?) RETURNING id_usuario",
+                    Integer.class,
+                    nombres, apellidos, correo, clave, dni);
+
+            if (idUsuario == null || idUsuario <= 0) {
+                throw new ResourceNotFoundException("No se pudo registrar el usuario");
+            }
+            return Map.of("mensaje", "REGISTRO_OK", "id_usuario", idUsuario);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResourceNotFoundException("Correo o DNI ya registrado");
         }
-        Map<String, Object> row = rows.get(0);
-        Number idUsuario = (Number) row.get("id_usuario");
-        if (idUsuario == null || idUsuario.intValue() <= 0) {
-            throw new ResourceNotFoundException("Correo ya registrado");
-        }
-        return Map.of("mensaje", "REGISTRO_OK", "id_usuario", idUsuario.intValue());
     }
 }

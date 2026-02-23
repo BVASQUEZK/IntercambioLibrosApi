@@ -11,18 +11,14 @@ import com.bardales.intercambiolibrosapi.entity.Solicitud;
 
 public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
 
-    @Query(value = "CALL sp_crear_solicitud(:idSolicitante, :idReceptor, :tipo)", nativeQuery = true)
-    Integer crearSolicitud(@Param("idSolicitante") Integer idSolicitante,
-            @Param("idReceptor") Integer idReceptor,
-            @Param("tipo") String tipo);
-
     @Modifying
     @Query(value = "INSERT INTO detalle_solicitud (id_solicitud, id_libro, propietario) VALUES (:idSolicitud, :idLibro, :propietario)", nativeQuery = true)
     void vincularDetalle(@Param("idSolicitud") Integer idSolicitud,
             @Param("idLibro") Integer idLibro,
             @Param("propietario") String propietario);
 
-    @Query(value = "CALL sp_actualizar_estado_solicitud(:idSolicitud, :estado)", nativeQuery = true)
+    @Modifying
+    @Query(value = "UPDATE solicitud SET estado = :estado WHERE id_solicitud = :idSolicitud", nativeQuery = true)
     void actualizarEstado(@Param("idSolicitud") Integer idSolicitud, @Param("estado") String estado);
 
     @Query(value = "SELECT s.id_solicitud AS id_solicitud, "

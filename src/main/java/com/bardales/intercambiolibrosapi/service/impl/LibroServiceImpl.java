@@ -3,6 +3,7 @@ package com.bardales.intercambiolibrosapi.service.impl;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,9 +19,11 @@ import com.bardales.intercambiolibrosapi.service.LibroService;
 public class LibroServiceImpl implements LibroService {
 
     private final LibroRepository libroRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public LibroServiceImpl(LibroRepository libroRepository) {
+    public LibroServiceImpl(LibroRepository libroRepository, JdbcTemplate jdbcTemplate) {
         this.libroRepository = libroRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -52,41 +55,28 @@ public class LibroServiceImpl implements LibroService {
     @Override
     @Transactional
     public LibroCreadoDTO registrarLibro(int idUsuario, LibroRegistroDTO dto) {
-        String primeraUrl = null;
-        if (dto.getUrlsImagenes() != null) {
-            for (String url : dto.getUrlsImagenes()) {
-                if (url == null || url.isBlank()) {
-                    continue;
-                }
-                primeraUrl = url.trim();
-                break;
-            }
-        }
-
         String estadoNormalizado = normalizarEstado(dto.getEstado());
 
-        Integer idLibro = libroRepository.registrarLibro(
+        Integer idLibro = jdbcTemplate.queryForObject(
+                "INSERT INTO libro (id_usuario, id_categoria, titulo, autor, descripcion, estado, ubicacion, disponible) "
+                        +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, TRUE) RETURNING id_libro",
+                Integer.class,
                 idUsuario,
                 dto.getIdCategoria(),
                 dto.getTitulo(),
                 dto.getAutor(),
                 dto.getDescripcion(),
                 estadoNormalizado,
-                dto.getUbicacion(),
-                primeraUrl
-        );
+                dto.getUbicacion());
+
         if (idLibro == null || idLibro <= 0) {
             throw new RuntimeException("No se pudo registrar el libro");
         }
 
         if (dto.getUrlsImagenes() != null) {
-            boolean firstUsed = false;
             for (String url : dto.getUrlsImagenes()) {
                 if (url == null || url.isBlank()) {
-                    continue;
-                }
-                if (!firstUsed) {
-                    firstUsed = true;
                     continue;
                 }
                 libroRepository.vincularImagen(idLibro, url.trim());
