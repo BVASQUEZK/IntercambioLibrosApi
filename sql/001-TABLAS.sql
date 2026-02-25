@@ -26,7 +26,7 @@ CREATE TABLE usuario (
     correo VARCHAR(120) NOT NULL UNIQUE,
     telefono VARCHAR(20),
     password VARCHAR(255) NOT NULL,
-    url_foto_perfil VARCHAR(500),
+    url_foto_perfil TEXT,
     fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     estado VARCHAR(20) NOT NULL DEFAULT 'activo',
     CONSTRAINT ck_usuario_estado CHECK (estado IN ('activo', 'suspendido'))

@@ -17,9 +17,11 @@ import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UsuarioServiceImpl implements UsuarioService {
+    private static final int MAX_FOTO_CHARS = 3_000_000;
 
     private final UsuarioRepository usuarioRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -70,9 +72,13 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
+    @Transactional
     public LoginResponseDTO actualizarPerfil(int idUsuarioHeader, UsuarioUpdateDTO dto) {
         if (dto.getIdUsuario() == null || !dto.getIdUsuario().equals(idUsuarioHeader)) {
             throw new UnauthorizedException("No autorizado para editar este perfil");
+        }
+        if (dto.getUrlFoto() != null && dto.getUrlFoto().length() > MAX_FOTO_CHARS) {
+            throw new ResourceNotFoundException("La imagen de perfil es demasiado grande");
         }
 
         usuarioRepository.actualizarPerfil(

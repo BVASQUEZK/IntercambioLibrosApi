@@ -38,7 +38,7 @@ public class Usuario {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    @Column(name = "url_foto_perfil", length = 500)
+    @Column(name = "url_foto_perfil", columnDefinition = "TEXT")
     private String urlFotoPerfil;
 
     @CreationTimestamp
