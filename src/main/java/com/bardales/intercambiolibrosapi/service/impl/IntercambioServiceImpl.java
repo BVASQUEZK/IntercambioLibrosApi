@@ -13,6 +13,7 @@ import com.bardales.intercambiolibrosapi.dto.IntercambioRespuestaDTO;
 import com.bardales.intercambiolibrosapi.dto.IntercambioSolicitudDTO;
 import com.bardales.intercambiolibrosapi.dto.IntercambioSolicitudResumenDTO;
 import com.bardales.intercambiolibrosapi.entity.Libro;
+import com.bardales.intercambiolibrosapi.exception.ForbiddenException;
 import com.bardales.intercambiolibrosapi.exception.ResourceNotFoundException;
 import com.bardales.intercambiolibrosapi.exception.UnauthorizedException;
 import com.bardales.intercambiolibrosapi.repository.IntercambioJpaRepository;
@@ -45,8 +46,11 @@ public class IntercambioServiceImpl implements IntercambioService {
             throw new UnauthorizedException("No puedes solicitar tu propio libro");
         }
 
-        if (libro.getDisponible() != null && !libro.getDisponible()) {
-            throw new UnauthorizedException("El libro no está disponible");
+        String situacion = libro.getSituacion() == null ? "" : libro.getSituacion().trim().toLowerCase();
+        boolean ocupadoPorSituacion = "ocupado".equals(situacion);
+        boolean ocupadoPorDisponible = libro.getDisponible() != null && !libro.getDisponible();
+        if (ocupadoPorSituacion || ocupadoPorDisponible) {
+            throw new ForbiddenException("El libro esta ocupado");
         }
 
         Optional<Integer> solicitudExistente = buscarSolicitudActiva(
