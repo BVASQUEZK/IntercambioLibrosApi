@@ -1,6 +1,8 @@
 package com.bardales.intercambiolibrosapi.service.impl;
 
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.bardales.intercambiolibrosapi.dto.ResenaCrearDTO;
 import com.bardales.intercambiolibrosapi.dto.ResenaEstadoDTO;
+import com.bardales.intercambiolibrosapi.dto.ResenaUsuarioDTO;
 import com.bardales.intercambiolibrosapi.exception.ForbiddenException;
 import com.bardales.intercambiolibrosapi.exception.ResourceNotFoundException;
 import com.bardales.intercambiolibrosapi.exception.UnauthorizedException;
@@ -29,6 +32,46 @@ public class ResenaServiceImpl implements ResenaService {
         boolean yaReseno = yaReseno(idSolicitud, idUsuario);
         boolean puedeResenar = "finalizado".equals(solicitud.estado) && !yaReseno;
         return new ResenaEstadoDTO(idSolicitud, yaReseno, puedeResenar);
+    }
+
+    @Override
+    public List<ResenaUsuarioDTO> listarResenasPorUsuario(int idUsuario, Integer limit, Integer offset) {
+        int safeLimit = limit == null ? 0 : Math.max(0, Math.min(limit, 100));
+        int safeOffset = offset == null ? 0 : Math.max(0, offset);
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT r.id_resena, r.id_solicitud, r.id_evaluador, "
+                        + "TRIM(COALESCE(u.nombres, '') || ' ' || COALESCE(u.apellidos, '')) AS evaluador_nombre, "
+                        + "u.url_foto_perfil AS evaluador_foto, r.puntuacion, r.comentario, r.fecha "
+                        + "FROM resena r "
+                        + "INNER JOIN usuario u ON u.id_usuario = r.id_evaluador "
+                        + "WHERE r.id_evaluado = ? "
+                        + "ORDER BY r.fecha DESC");
+
+        List<Object> params = new ArrayList<>();
+        params.add(idUsuario);
+
+        if (safeLimit > 0) {
+            sql.append(" LIMIT ?");
+            params.add(safeLimit);
+        }
+        if (safeOffset > 0) {
+            sql.append(" OFFSET ?");
+            params.add(safeOffset);
+        }
+
+        return jdbcTemplate.query(
+                sql.toString(),
+                (rs, rowNum) -> new ResenaUsuarioDTO(
+                        rs.getInt("id_resena"),
+                        rs.getInt("id_solicitud"),
+                        rs.getInt("id_evaluador"),
+                        rs.getString("evaluador_nombre"),
+                        rs.getString("evaluador_foto"),
+                        rs.getInt("puntuacion"),
+                        rs.getString("comentario"),
+                        rs.getTimestamp("fecha") == null ? null : rs.getTimestamp("fecha").toLocalDateTime()),
+                params.toArray());
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.bardales.intercambiolibrosapi.controller;
 
 import java.util.Map;
+import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,10 +10,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.security.core.Authentication;
 
 import com.bardales.intercambiolibrosapi.dto.ResenaCrearDTO;
 import com.bardales.intercambiolibrosapi.dto.ResenaEstadoDTO;
+import com.bardales.intercambiolibrosapi.dto.ResenaUsuarioDTO;
 import com.bardales.intercambiolibrosapi.security.AuthenticatedUserUtil;
 import com.bardales.intercambiolibrosapi.service.ResenaService;
 
@@ -34,6 +37,14 @@ public class ResenaController {
             Authentication authentication) {
         int idUsuario = AuthenticatedUserUtil.getUserId(authentication);
         return resenaService.obtenerEstadoResena(idSolicitud, idUsuario);
+    }
+
+    @GetMapping("/usuario/{idUsuario}")
+    public List<ResenaUsuarioDTO> listarResenasUsuario(
+            @PathVariable("idUsuario") int idUsuario,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "offset", required = false) Integer offset) {
+        return resenaService.listarResenasPorUsuario(idUsuario, limit, offset);
     }
 
     @PostMapping("/{idSolicitud}")
