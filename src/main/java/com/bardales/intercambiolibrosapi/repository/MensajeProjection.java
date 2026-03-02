@@ -7,4 +7,5 @@ public interface MensajeProjection {
     Integer getId_emisor();
     String getContenido();
     LocalDateTime getFecha_envio();
+    Boolean getLeido();
 }

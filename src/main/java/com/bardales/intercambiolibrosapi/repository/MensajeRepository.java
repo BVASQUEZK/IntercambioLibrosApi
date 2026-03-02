@@ -13,10 +13,14 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Integer> {
 
     @Query(value = "SELECT m.id_mensaje AS id_mensaje, m.id_emisor AS id_emisor, "
             +
-            "m.contenido AS contenido, m.fecha_envio AS fecha_envio "
+            "m.contenido AS contenido, m.fecha_envio AS fecha_envio, m.leido AS leido "
             +
             "FROM mensaje m WHERE m.id_solicitud = :idSolicitud ORDER BY m.fecha_envio ASC", nativeQuery = true)
     List<MensajeProjection> listarMensajes(@Param("idSolicitud") Integer idSolicitud);
+
+    @Modifying
+    @Query(value = "UPDATE mensaje SET leido = TRUE WHERE id_solicitud = :idSolicitud AND id_emisor <> :idUsuario AND leido = FALSE", nativeQuery = true)
+    void marcarMensajesLeidos(@Param("idSolicitud") Integer idSolicitud, @Param("idUsuario") Integer idUsuario);
 
     @Modifying
     @Query(value = "INSERT INTO mensaje (id_solicitud, id_emisor, contenido) VALUES (:idSolicitud, :idEmisor, :contenido)", nativeQuery = true)

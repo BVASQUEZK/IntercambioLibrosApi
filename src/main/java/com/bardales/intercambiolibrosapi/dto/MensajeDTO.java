@@ -8,16 +8,24 @@ public class MensajeDTO {
     private String contenido;
     private LocalDateTime fechaEnvio;
     private boolean esMio;
+    private boolean leido;
 
     public MensajeDTO() {
     }
 
-    public MensajeDTO(Integer idMensaje, Integer idEmisor, String contenido, LocalDateTime fechaEnvio, boolean esMio) {
+    public MensajeDTO(
+            Integer idMensaje,
+            Integer idEmisor,
+            String contenido,
+            LocalDateTime fechaEnvio,
+            boolean esMio,
+            boolean leido) {
         this.idMensaje = idMensaje;
         this.idEmisor = idEmisor;
         this.contenido = contenido;
         this.fechaEnvio = fechaEnvio;
         this.esMio = esMio;
+        this.leido = leido;
     }
 
     public Integer getIdMensaje() {
@@ -58,5 +66,13 @@ public class MensajeDTO {
 
     public void setEsMio(boolean esMio) {
         this.esMio = esMio;
+    }
+
+    public boolean isLeido() {
+        return leido;
+    }
+
+    public void setLeido(boolean leido) {
+        this.leido = leido;
     }
 }

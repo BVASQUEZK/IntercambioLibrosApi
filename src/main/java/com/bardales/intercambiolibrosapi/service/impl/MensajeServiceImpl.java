@@ -25,6 +25,7 @@ public class MensajeServiceImpl implements MensajeService {
     @Override
     public List<MensajeDTO> listarMensajes(int idSolicitud, int idUsuario) {
         validarParticipante(idSolicitud, idUsuario);
+        mensajeRepository.marcarMensajesLeidos(idSolicitud, idUsuario);
         return mensajeRepository.listarMensajes(idSolicitud)
                 .stream()
                 .map(p -> toDto(p, idUsuario))
@@ -50,11 +51,13 @@ public class MensajeServiceImpl implements MensajeService {
 
     private MensajeDTO toDto(MensajeProjection p, int idUsuario) {
         boolean esMio = p.getId_emisor() != null && p.getId_emisor() == idUsuario;
+        boolean leido = Boolean.TRUE.equals(p.getLeido());
         return new MensajeDTO(
                 p.getId_mensaje(),
                 p.getId_emisor(),
                 p.getContenido(),
                 p.getFecha_envio(),
-                esMio);
+                esMio,
+                leido);
     }
 }
