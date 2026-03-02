@@ -4,6 +4,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,12 +23,33 @@ import com.bardales.intercambiolibrosapi.service.LibroService;
 @Service
 public class LibroServiceImpl implements LibroService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LibroServiceImpl.class);
+
     private final LibroRepository libroRepository;
     private final JdbcTemplate jdbcTemplate;
 
     public LibroServiceImpl(LibroRepository libroRepository, JdbcTemplate jdbcTemplate) {
         this.libroRepository = libroRepository;
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @PostConstruct
+    void inicializarEsquemaLibroCategoria() {
+        try {
+            jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS libro_categoria ("
+                            + "id_libro INT NOT NULL REFERENCES libro(id_libro) ON DELETE CASCADE, "
+                            + "id_categoria INT NOT NULL REFERENCES categoria(id_categoria) ON DELETE CASCADE, "
+                            + "PRIMARY KEY (id_libro, id_categoria)"
+                            + ")");
+            jdbcTemplate.update(
+                    "INSERT INTO libro_categoria (id_libro, id_categoria) "
+                            + "SELECT l.id_libro, l.id_categoria FROM libro l "
+                            + "WHERE l.id_categoria IS NOT NULL "
+                            + "ON CONFLICT DO NOTHING");
+        } catch (Exception ex) {
+            LOGGER.warn("No se pudo inicializar libro_categoria automaticamente: {}", ex.getMessage());
+        }
     }
 
     @Override
@@ -55,18 +80,37 @@ public class LibroServiceImpl implements LibroService {
         String estadoFiltro = (estado == null || estado.isBlank()) ? null : estado.trim();
         String alcanceNormalizado = (alcance == null || alcance.isBlank()) ? "amplia" : alcance.trim().toLowerCase();
 
-        return libroRepository.buscarLibros(
-                        filtro,
-                        filtro,
-                        idCategoria,
-                        estadoFiltro,
-                        idUsuario,
-                        alcanceNormalizado,
-                        safeCantidad,
-                        offset)
-                .stream()
-                .map(this::toBusquedaDto)
-                .collect(Collectors.toList());
+        try {
+            return libroRepository.buscarLibros(
+                            filtro,
+                            filtro,
+                            idCategoria,
+                            estadoFiltro,
+                            idUsuario,
+                            alcanceNormalizado,
+                            safeCantidad,
+                            offset)
+                    .stream()
+                    .map(this::toBusquedaDto)
+                    .collect(Collectors.toList());
+        } catch (DataAccessException ex) {
+            if (isMissingLibroCategoria(ex)) {
+                LOGGER.warn("Fallback de busqueda sin libro_categoria por esquema desactualizado");
+                return libroRepository.buscarLibrosLegacy(
+                                filtro,
+                                filtro,
+                                idCategoria,
+                                estadoFiltro,
+                                idUsuario,
+                                alcanceNormalizado,
+                                safeCantidad,
+                                offset)
+                        .stream()
+                        .map(this::toBusquedaDto)
+                        .collect(Collectors.toList());
+            }
+            throw ex;
+        }
     }
 
     @Override
@@ -106,7 +150,14 @@ public class LibroServiceImpl implements LibroService {
         }
 
         for (Integer idCategoria : categorias) {
-            libroRepository.vincularCategoria(idLibro, idCategoria);
+            try {
+                libroRepository.vincularCategoria(idLibro, idCategoria);
+            } catch (DataAccessException ex) {
+                if (!isMissingLibroCategoria(ex)) {
+                    throw ex;
+                }
+                LOGGER.warn("No se pudo vincular categoria N:N por falta de tabla libro_categoria");
+            }
         }
 
         return new LibroCreadoDTO(
@@ -173,5 +224,18 @@ public class LibroServiceImpl implements LibroService {
             return List.of(idCategoria);
         }
         return List.of();
+    }
+
+    private boolean isMissingLibroCategoria(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains("libro_categoria")
+                    && message.toLowerCase().contains("does not exist")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
