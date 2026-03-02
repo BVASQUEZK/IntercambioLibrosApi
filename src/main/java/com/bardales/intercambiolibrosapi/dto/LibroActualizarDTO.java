@@ -6,7 +6,7 @@ public class LibroActualizarDTO {
     private String titulo;
     private String autor;
     private String descripcion;
-    private String estado;
+    private String condicion;
     private String situacion;
     private String ubicacion;
     private Integer idCategoria;
@@ -40,12 +40,12 @@ public class LibroActualizarDTO {
         this.descripcion = descripcion;
     }
 
-    public String getEstado() {
-        return estado;
+    public String getCondicion() {
+        return condicion;
     }
 
-    public void setEstado(String estado) {
-        this.estado = estado;
+    public void setCondicion(String condicion) {
+        this.condicion = condicion;
     }
 
     public String getSituacion() {

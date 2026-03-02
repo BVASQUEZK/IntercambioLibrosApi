@@ -56,13 +56,42 @@ public class LibroServiceImpl implements LibroService {
             jdbcTemplate.execute("ALTER TABLE IF EXISTS imagen_libro ALTER COLUMN url_imagen TYPE TEXT");
 
             jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ADD COLUMN IF NOT EXISTS situacion VARCHAR(30)");
-            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ADD COLUMN IF NOT EXISTS estado_logico VARCHAR(20)");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ADD COLUMN IF NOT EXISTS estado VARCHAR(20)");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ADD COLUMN IF NOT EXISTS condicion VARCHAR(30)");
+
+            jdbcTemplate.update(
+                    "UPDATE libro SET condicion = CASE "
+                            + "WHEN LOWER(TRIM(COALESCE(estado, ''))) = 'regular' THEN 'aceptable' "
+                            + "WHEN LOWER(TRIM(COALESCE(estado, ''))) IN ('nuevo', 'como nuevo', 'muy bueno', 'bueno', 'aceptable') "
+                            + "THEN LOWER(TRIM(estado)) "
+                            + "ELSE 'bueno' END "
+                            + "WHERE condicion IS NULL OR TRIM(condicion) = ''");
+
+            jdbcTemplate.execute(
+                    "DO $$ BEGIN "
+                            + "IF EXISTS ("
+                            + "SELECT 1 FROM information_schema.columns "
+                            + "WHERE table_schema = 'public' AND table_name = 'libro' AND column_name = 'estado_logico'"
+                            + ") THEN "
+                            + "UPDATE libro SET estado = CASE "
+                            + "WHEN LOWER(TRIM(COALESCE(estado, ''))) IN ('activo', 'inactivo') THEN LOWER(TRIM(estado)) "
+                            + "WHEN LOWER(TRIM(COALESCE(estado_logico, ''))) IN ('activo', 'inactivo') THEN LOWER(TRIM(estado_logico)) "
+                            + "ELSE 'activo' END "
+                            + "WHERE estado IS NULL OR TRIM(estado) = '' OR LOWER(TRIM(estado)) NOT IN ('activo', 'inactivo'); "
+                            + "ELSE "
+                            + "UPDATE libro SET estado = CASE "
+                            + "WHEN LOWER(TRIM(COALESCE(estado, ''))) IN ('activo', 'inactivo') THEN LOWER(TRIM(estado)) "
+                            + "ELSE 'activo' END "
+                            + "WHERE estado IS NULL OR TRIM(estado) = '' OR LOWER(TRIM(estado)) NOT IN ('activo', 'inactivo'); "
+                            + "END IF; "
+                            + "END $$;");
+
             jdbcTemplate.update(
                     "UPDATE libro SET situacion = CASE WHEN COALESCE(disponible, TRUE) THEN 'disponible' ELSE 'ocupado' END "
                             + "WHERE situacion IS NULL OR TRIM(situacion) = ''");
-            jdbcTemplate.update("UPDATE libro SET estado_logico = 'activo' WHERE estado_logico IS NULL OR TRIM(estado_logico) = ''");
             jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ALTER COLUMN situacion SET DEFAULT 'disponible'");
-            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ALTER COLUMN estado_logico SET DEFAULT 'activo'");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ALTER COLUMN estado SET DEFAULT 'activo'");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ALTER COLUMN condicion SET DEFAULT 'bueno'");
         } catch (Exception ex) {
             LOGGER.warn("No se pudieron aplicar ajustes de esquema de libros automaticamente: {}", ex.getMessage());
         }
@@ -84,7 +113,7 @@ public class LibroServiceImpl implements LibroService {
     public List<LibroDTO> buscarLibros(
             String query,
             Integer idCategoria,
-            String estado,
+            String condicion,
             Integer idUsuario,
             String alcance,
             int pagina,
@@ -93,15 +122,19 @@ public class LibroServiceImpl implements LibroService {
         int safeCantidad = Math.max(cantidad, 1);
         int offset = (safePagina - 1) * safeCantidad;
         String filtro = (query == null || query.isBlank()) ? null : query.trim();
-        String estadoFiltro = (estado == null || estado.isBlank()) ? null : estado.trim();
+        String condicionFiltro = (condicion == null || condicion.isBlank()) ? null : condicion.trim();
         String alcanceNormalizado = normalizarAlcance(alcance);
+        if (filtro != null) {
+            // Si se busca por texto (titulo/autor), mostrar todos y ordenar por cercania.
+            alcanceNormalizado = "internacional";
+        }
 
         try {
             return libroRepository.buscarLibros(
                             filtro,
                             filtro,
                             idCategoria,
-                            estadoFiltro,
+                            condicionFiltro,
                             idUsuario,
                             alcanceNormalizado,
                             safeCantidad,
@@ -116,7 +149,7 @@ public class LibroServiceImpl implements LibroService {
                                 filtro,
                                 filtro,
                                 idCategoria,
-                                estadoFiltro,
+                                condicionFiltro,
                                 idUsuario,
                                 alcanceNormalizado,
                                 safeCantidad,
@@ -132,9 +165,9 @@ public class LibroServiceImpl implements LibroService {
     @Override
     @Transactional
     public LibroCreadoDTO registrarLibro(int idUsuario, LibroRegistroDTO dto) {
-        String estadoNormalizado = normalizarEstado(dto.getEstado());
+        String estadoNormalizado = "activo";
+        String condicionNormalizada = normalizarCondicion(dto.getCondicion());
         String situacionNormalizada = normalizarSituacion(dto.getSituacion());
-        String estadoLogico = "activo";
         boolean disponible = esDisponible(situacionNormalizada);
 
         List<Integer> categorias = normalizarCategorias(dto.getIdCategorias(), dto.getIdCategoria());
@@ -146,7 +179,7 @@ public class LibroServiceImpl implements LibroService {
         List<String> imagenes = normalizarUrls(dto.getUrlsImagenes());
 
         Integer idLibro = jdbcTemplate.queryForObject(
-                "INSERT INTO libro (id_usuario, id_categoria, titulo, autor, descripcion, estado, situacion, estado_logico, ubicacion, disponible) "
+                "INSERT INTO libro (id_usuario, id_categoria, titulo, autor, descripcion, estado, condicion, situacion, ubicacion, disponible) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_libro",
                 Integer.class,
                 idUsuario,
@@ -155,8 +188,8 @@ public class LibroServiceImpl implements LibroService {
                 dto.getAutor(),
                 dto.getDescripcion(),
                 estadoNormalizado,
+                condicionNormalizada,
                 situacionNormalizada,
-                estadoLogico,
                 dto.getUbicacion(),
                 disponible);
 
@@ -188,8 +221,8 @@ public class LibroServiceImpl implements LibroService {
                 dto.getAutor(),
                 dto.getDescripcion(),
                 estadoNormalizado,
+                condicionNormalizada,
                 situacionNormalizada,
-                estadoLogico,
                 dto.getUbicacion(),
                 imagenes
         );
@@ -201,7 +234,7 @@ public class LibroServiceImpl implements LibroService {
         Libro libro = libroRepository.findByIdLibroAndIdUsuario(idLibro, idUsuario)
                 .orElseThrow(() -> new ResourceNotFoundException("Libro no encontrado"));
 
-        if (!"activo".equalsIgnoreCase(normalizarEstadoLogico(libro.getEstadoLogico()))) {
+        if (!"activo".equalsIgnoreCase(normalizarEstadoLibro(libro.getEstado()))) {
             throw new ResourceNotFoundException("El libro esta inactivo y no se puede editar");
         }
 
@@ -215,19 +248,23 @@ public class LibroServiceImpl implements LibroService {
         String descripcion = dto.getDescripcion() == null ? libro.getDescripcion() : valorNullable(dto.getDescripcion());
         String ubicacion = dto.getUbicacion() == null ? libro.getUbicacion() : valorNullable(dto.getUbicacion());
 
-        String estado = dto.getEstado() == null ? libro.getEstado() : normalizarEstado(dto.getEstado());
+        String estado = normalizarEstadoLibro(libro.getEstado());
+        String condicion = dto.getCondicion() == null
+                ? normalizarCondicion(libro.getCondicion())
+                : normalizarCondicion(dto.getCondicion());
         String situacion = dto.getSituacion() == null
                 ? normalizarSituacion(libro.getSituacion())
                 : normalizarSituacion(dto.getSituacion());
         boolean disponible = esDisponible(situacion);
 
         jdbcTemplate.update(
-                "UPDATE libro SET id_categoria = ?, titulo = ?, autor = ?, descripcion = ?, estado = ?, situacion = ?, ubicacion = ?, disponible = ? WHERE id_libro = ?",
+                "UPDATE libro SET id_categoria = ?, titulo = ?, autor = ?, descripcion = ?, estado = ?, condicion = ?, situacion = ?, ubicacion = ?, disponible = ? WHERE id_libro = ?",
                 categoriaPrincipal,
                 titulo,
                 autor,
                 descripcion,
                 estado,
+                condicion,
                 situacion,
                 ubicacion,
                 disponible,
@@ -267,8 +304,8 @@ public class LibroServiceImpl implements LibroService {
                 autor,
                 descripcion,
                 estado,
+                condicion,
                 situacion,
-                "activo",
                 ubicacion,
                 imagenesDto);
     }
@@ -279,22 +316,22 @@ public class LibroServiceImpl implements LibroService {
         Libro libro = libroRepository.findByIdLibroAndIdUsuario(idLibro, idUsuario)
                 .orElseThrow(() -> new ResourceNotFoundException("Libro no encontrado"));
 
-        if ("inactivo".equalsIgnoreCase(normalizarEstadoLogico(libro.getEstadoLogico()))) {
+        if ("inactivo".equalsIgnoreCase(normalizarEstadoLibro(libro.getEstado()))) {
             return Map.of(
                     "mensaje", "El libro ya estaba inactivo",
                     "idLibro", idLibro,
-                    "estadoLogico", "inactivo");
+                    "estado", "inactivo");
         }
 
         jdbcTemplate.update(
-                "UPDATE libro SET estado_logico = 'inactivo', situacion = 'ocupado', disponible = FALSE WHERE id_libro = ? AND id_usuario = ?",
+                "UPDATE libro SET estado = 'inactivo', situacion = 'ocupado', disponible = FALSE WHERE id_libro = ? AND id_usuario = ?",
                 idLibro,
                 idUsuario);
 
         return Map.of(
                 "mensaje", "Libro eliminado logicamente",
                 "idLibro", idLibro,
-                "estadoLogico", "inactivo",
+                "estado", "inactivo",
                 "situacion", "ocupado");
     }
 
@@ -321,16 +358,31 @@ public class LibroServiceImpl implements LibroService {
         );
     }
 
-    private String normalizarEstado(String estado) {
-        if (estado == null) {
-            return null;
+    private String normalizarCondicion(String condicion) {
+        if (condicion == null || condicion.isBlank()) {
+            return "bueno";
+        }
+        String value = condicion.trim().toLowerCase();
+        if ("regular".equals(value)) {
+            return "aceptable";
+        }
+        if (!"nuevo".equals(value)
+                && !"como nuevo".equals(value)
+                && !"muy bueno".equals(value)
+                && !"bueno".equals(value)
+                && !"aceptable".equals(value)) {
+            return "bueno";
+        }
+        return value;
+    }
+
+    private String normalizarEstadoLibro(String estado) {
+        if (estado == null || estado.isBlank()) {
+            return "activo";
         }
         String value = estado.trim().toLowerCase();
-        if (value.isBlank()) {
-            return null;
-        }
-        if ("como nuevo".equals(value)) {
-            return "muy bueno";
+        if (!"activo".equals(value) && !"inactivo".equals(value)) {
+            return "activo";
         }
         return value;
     }
@@ -364,13 +416,6 @@ public class LibroServiceImpl implements LibroService {
             return "disponible";
         }
         return value;
-    }
-
-    private String normalizarEstadoLogico(String estadoLogico) {
-        if (estadoLogico == null || estadoLogico.isBlank()) {
-            return "activo";
-        }
-        return estadoLogico.trim().toLowerCase();
     }
 
     private boolean esDisponible(String situacion) {

@@ -15,7 +15,7 @@ public class LibroRegistroDTO {
     private String descripcion;
 
     @NotBlank
-    private String estado;
+    private String condicion;
 
     private String situacion;
 
@@ -30,12 +30,12 @@ public class LibroRegistroDTO {
     public LibroRegistroDTO() {
     }
 
-    public LibroRegistroDTO(String titulo, String autor, String descripcion, String estado, String situacion, String ubicacion,
+    public LibroRegistroDTO(String titulo, String autor, String descripcion, String condicion, String situacion, String ubicacion,
             Integer idCategoria, List<Integer> idCategorias, List<String> urlsImagenes) {
         this.titulo = titulo;
         this.autor = autor;
         this.descripcion = descripcion;
-        this.estado = estado;
+        this.condicion = condicion;
         this.situacion = situacion;
         this.ubicacion = ubicacion;
         this.idCategoria = idCategoria;
@@ -67,12 +67,12 @@ public class LibroRegistroDTO {
         this.descripcion = descripcion;
     }
 
-    public String getEstado() {
-        return estado;
+    public String getCondicion() {
+        return condicion;
     }
 
-    public void setEstado(String estado) {
-        this.estado = estado;
+    public void setCondicion(String condicion) {
+        this.condicion = condicion;
     }
 
     public String getSituacion() {

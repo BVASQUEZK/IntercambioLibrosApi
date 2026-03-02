@@ -47,12 +47,12 @@ public class LibroController {
     public List<LibroDTO> buscarLibros(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Integer idCategoria,
-            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) String condicion,
             @RequestParam(required = false) Integer idUsuario,
             @RequestParam(defaultValue = "internacional") String alcance,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return libroService.buscarLibros(query, idCategoria, estado, idUsuario, alcance, page, size);
+        return libroService.buscarLibros(query, idCategoria, condicion, idUsuario, alcance, page, size);
     }
 
     @PostMapping("/registrar")

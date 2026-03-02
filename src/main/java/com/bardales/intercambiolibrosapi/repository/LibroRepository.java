@@ -29,7 +29,7 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             + "LIMIT 1 "
             + ") uo ON TRUE "
             +
-            "WHERE COALESCE(l.estado_logico, 'activo') = 'activo' "
+            "WHERE COALESCE(l.estado, 'activo') = 'activo' "
             +
             "ORDER BY l.fecha_registro DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
     List<LibroHomeProjection> listarRecientes(@Param("limit") int limit, @Param("offset") int offset);
@@ -58,17 +58,19 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             + "LIMIT 1 "
             + ") uu ON TRUE "
             +
-            "WHERE (:titulo IS NULL OR l.titulo ILIKE CONCAT('%', :titulo, '%')) "
-            +
-            "AND (:autor IS NULL OR l.autor ILIKE CONCAT('%', :autor, '%')) "
+            "WHERE ("
+            + "(:titulo IS NULL AND :autor IS NULL) "
+            + "OR (:titulo IS NOT NULL AND l.titulo ILIKE CONCAT('%', :titulo, '%')) "
+            + "OR (:autor IS NOT NULL AND l.autor ILIKE CONCAT('%', :autor, '%'))"
+            + ") "
             +
             "AND (:idCategoria IS NULL OR l.id_categoria = :idCategoria OR EXISTS ("
             + "SELECT 1 FROM libro_categoria lc WHERE lc.id_libro = l.id_libro AND lc.id_categoria = :idCategoria"
             + ")) "
             +
-            "AND (:estado IS NULL OR l.estado = :estado) "
+            "AND (:condicion IS NULL OR l.condicion = :condicion) "
             +
-            "AND COALESCE(l.estado_logico, 'activo') = 'activo' "
+            "AND COALESCE(l.estado, 'activo') = 'activo' "
             +
             "AND (:idUsuario IS NULL OR l.id_usuario <> :idUsuario) "
             +
@@ -111,7 +113,7 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             @Param("titulo") String titulo,
             @Param("autor") String autor,
             @Param("idCategoria") Integer idCategoria,
-            @Param("estado") String estado,
+            @Param("condicion") String condicion,
             @Param("idUsuario") Integer idUsuario,
             @Param("alcance") String alcance,
             @Param("limit") int limit,
@@ -141,15 +143,17 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             + "LIMIT 1 "
             + ") uu ON TRUE "
             +
-            "WHERE (:titulo IS NULL OR l.titulo ILIKE CONCAT('%', :titulo, '%')) "
-            +
-            "AND (:autor IS NULL OR l.autor ILIKE CONCAT('%', :autor, '%')) "
+            "WHERE ("
+            + "(:titulo IS NULL AND :autor IS NULL) "
+            + "OR (:titulo IS NOT NULL AND l.titulo ILIKE CONCAT('%', :titulo, '%')) "
+            + "OR (:autor IS NOT NULL AND l.autor ILIKE CONCAT('%', :autor, '%'))"
+            + ") "
             +
             "AND (:idCategoria IS NULL OR l.id_categoria = :idCategoria) "
             +
-            "AND (:estado IS NULL OR l.estado = :estado) "
+            "AND (:condicion IS NULL OR l.condicion = :condicion) "
             +
-            "AND COALESCE(l.estado_logico, 'activo') = 'activo' "
+            "AND COALESCE(l.estado, 'activo') = 'activo' "
             +
             "AND (:idUsuario IS NULL OR l.id_usuario <> :idUsuario) "
             +
@@ -192,7 +196,7 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             @Param("titulo") String titulo,
             @Param("autor") String autor,
             @Param("idCategoria") Integer idCategoria,
-            @Param("estado") String estado,
+            @Param("condicion") String condicion,
             @Param("idUsuario") Integer idUsuario,
             @Param("alcance") String alcance,
             @Param("limit") int limit,

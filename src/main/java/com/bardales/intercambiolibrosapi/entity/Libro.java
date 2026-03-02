@@ -54,11 +54,11 @@ public class Libro {
     @Column(name = "estado")
     private String estado;
 
+    @Column(name = "condicion")
+    private String condicion;
+
     @Column(name = "situacion")
     private String situacion;
-
-    @Column(name = "estado_logico")
-    private String estadoLogico;
 
     @Column(name = "ubicacion")
     private String ubicacion;
@@ -77,7 +77,7 @@ public class Libro {
     }
 
     public Libro(Integer idLibro, Integer idUsuario, Integer idCategoria, List<Categoria> categorias, String titulo, String autor,
-            String descripcion, String estado, String situacion, String estadoLogico, String ubicacion,
+            String descripcion, String estado, String condicion, String situacion, String ubicacion,
             Boolean disponible, LocalDateTime fechaRegistro, List<ImagenLibro> imagenes) {
         this.idLibro = idLibro;
         this.idUsuario = idUsuario;
@@ -87,8 +87,8 @@ public class Libro {
         this.autor = autor;
         this.descripcion = descripcion;
         this.estado = estado;
+        this.condicion = condicion;
         this.situacion = situacion;
-        this.estadoLogico = estadoLogico;
         this.ubicacion = ubicacion;
         this.disponible = disponible;
         this.fechaRegistro = fechaRegistro;
@@ -159,20 +159,20 @@ public class Libro {
         this.estado = estado;
     }
 
+    public String getCondicion() {
+        return condicion;
+    }
+
+    public void setCondicion(String condicion) {
+        this.condicion = condicion;
+    }
+
     public String getSituacion() {
         return situacion;
     }
 
     public void setSituacion(String situacion) {
         this.situacion = situacion;
-    }
-
-    public String getEstadoLogico() {
-        return estadoLogico;
-    }
-
-    public void setEstadoLogico(String estadoLogico) {
-        this.estadoLogico = estadoLogico;
     }
 
     public String getUbicacion() {

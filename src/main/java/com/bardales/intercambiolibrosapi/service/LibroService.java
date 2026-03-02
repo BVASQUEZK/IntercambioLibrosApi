@@ -14,7 +14,7 @@ public interface LibroService {
     List<LibroDTO> buscarLibros(
             String query,
             Integer idCategoria,
-            String estado,
+            String condicion,
             Integer idUsuario,
             String alcance,
             int pagina,

@@ -11,8 +11,8 @@ public class LibroCreadoDTO {
     private String autor;
     private String descripcion;
     private String estado;
+    private String condicion;
     private String situacion;
-    private String estadoLogico;
     private String ubicacion;
     private List<String> urlsImagenes;
 
@@ -20,7 +20,7 @@ public class LibroCreadoDTO {
     }
 
     public LibroCreadoDTO(Integer idLibro, Integer idUsuario, Integer idCategoria, List<Integer> idCategorias, String titulo, String autor,
-            String descripcion, String estado, String situacion, String estadoLogico, String ubicacion, List<String> urlsImagenes) {
+            String descripcion, String estado, String condicion, String situacion, String ubicacion, List<String> urlsImagenes) {
         this.idLibro = idLibro;
         this.idUsuario = idUsuario;
         this.idCategoria = idCategoria;
@@ -29,8 +29,8 @@ public class LibroCreadoDTO {
         this.autor = autor;
         this.descripcion = descripcion;
         this.estado = estado;
+        this.condicion = condicion;
         this.situacion = situacion;
-        this.estadoLogico = estadoLogico;
         this.ubicacion = ubicacion;
         this.urlsImagenes = urlsImagenes;
     }
@@ -99,20 +99,20 @@ public class LibroCreadoDTO {
         this.estado = estado;
     }
 
+    public String getCondicion() {
+        return condicion;
+    }
+
+    public void setCondicion(String condicion) {
+        this.condicion = condicion;
+    }
+
     public String getSituacion() {
         return situacion;
     }
 
     public void setSituacion(String situacion) {
         this.situacion = situacion;
-    }
-
-    public String getEstadoLogico() {
-        return estadoLogico;
-    }
-
-    public void setEstadoLogico(String estadoLogico) {
-        this.estadoLogico = estadoLogico;
     }
 
     public String getUbicacion() {
