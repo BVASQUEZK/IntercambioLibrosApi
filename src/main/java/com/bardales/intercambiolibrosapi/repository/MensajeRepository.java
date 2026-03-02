@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.bardales.intercambiolibrosapi.entity.Mensaje;
 
@@ -19,10 +20,12 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Integer> {
     List<MensajeProjection> listarMensajes(@Param("idSolicitud") Integer idSolicitud);
 
     @Modifying
+    @Transactional
     @Query(value = "UPDATE mensaje SET leido = TRUE WHERE id_solicitud = :idSolicitud AND id_emisor <> :idUsuario AND leido = FALSE", nativeQuery = true)
     void marcarMensajesLeidos(@Param("idSolicitud") Integer idSolicitud, @Param("idUsuario") Integer idUsuario);
 
     @Modifying
+    @Transactional
     @Query(value = "INSERT INTO mensaje (id_solicitud, id_emisor, contenido) VALUES (:idSolicitud, :idEmisor, :contenido)", nativeQuery = true)
     void enviarMensaje(@Param("idSolicitud") Integer idSolicitud,
             @Param("idEmisor") Integer idEmisor,
