@@ -5,24 +5,23 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import com.bardales.intercambiolibrosapi.dto.SolicitudCrearDTO;
 import com.bardales.intercambiolibrosapi.dto.SolicitudResumenDTO;
+import com.bardales.intercambiolibrosapi.security.AuthenticatedUserUtil;
 import com.bardales.intercambiolibrosapi.service.SolicitudService;
 
 @RestController
 @RequestMapping("/api/solicitudes")
-@CrossOrigin(origins = "*")
 public class SolicitudController {
 
     private static final Set<String> ESTADOS_PERMITIDOS = Set.of(
@@ -42,15 +41,17 @@ public class SolicitudController {
     }
 
     @GetMapping("/usuario")
-    public List<SolicitudResumenDTO> listarPorUsuarioHeader(@RequestHeader("X-User-Id") int idUsuario) {
+    public List<SolicitudResumenDTO> listarPorUsuarioHeader(Authentication authentication) {
+        int idUsuario = AuthenticatedUserUtil.getUserId(authentication);
         return solicitudService.listarPorUsuario(idUsuario);
     }
 
     @PatchMapping("/{id}/estado")
     public ResponseEntity<Map<String, Object>> actualizarEstado(
             @PathVariable("id") int idSolicitud,
-            @RequestHeader("X-User-Id") int idUsuario,
+            Authentication authentication,
             @RequestParam("estado") String nuevoEstado) {
+        int idUsuario = AuthenticatedUserUtil.getUserId(authentication);
         String estado = nuevoEstado == null ? "" : nuevoEstado.trim().toLowerCase();
         if (!ESTADOS_PERMITIDOS.contains(estado)) {
             return ResponseEntity.badRequest()

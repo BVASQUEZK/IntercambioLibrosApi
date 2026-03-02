@@ -4,30 +4,29 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import com.bardales.intercambiolibrosapi.dto.LibroActualizarDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroCreadoDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroHomeDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroRegistroDTO;
+import com.bardales.intercambiolibrosapi.security.AuthenticatedUserUtil;
 import com.bardales.intercambiolibrosapi.service.LibroService;
 
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/libros")
-@CrossOrigin(origins = "*")
 public class LibroController {
 
     private final LibroService libroService;
@@ -57,8 +56,9 @@ public class LibroController {
 
     @PostMapping("/registrar")
     public ResponseEntity<LibroCreadoDTO> registrarLibro(
-            @RequestHeader("X-User-Id") int idUsuario,
+            Authentication authentication,
             @Valid @RequestBody LibroRegistroDTO dto) {
+        int idUsuario = AuthenticatedUserUtil.getUserId(authentication);
         LibroCreadoDTO libro = libroService.registrarLibro(idUsuario, dto);
         return ResponseEntity.status(201).body(libro);
     }
@@ -66,8 +66,9 @@ public class LibroController {
     @PutMapping("/{idLibro}")
     public ResponseEntity<LibroCreadoDTO> actualizarLibro(
             @PathVariable int idLibro,
-            @RequestHeader("X-User-Id") int idUsuario,
+            Authentication authentication,
             @RequestBody LibroActualizarDTO dto) {
+        int idUsuario = AuthenticatedUserUtil.getUserId(authentication);
         LibroCreadoDTO libro = libroService.actualizarLibro(idUsuario, idLibro, dto);
         return ResponseEntity.ok(libro);
     }
@@ -75,7 +76,8 @@ public class LibroController {
     @DeleteMapping("/{idLibro}")
     public ResponseEntity<Map<String, Object>> eliminarLibroLogico(
             @PathVariable int idLibro,
-            @RequestHeader("X-User-Id") int idUsuario) {
+            Authentication authentication) {
+        int idUsuario = AuthenticatedUserUtil.getUserId(authentication);
         return ResponseEntity.ok(libroService.eliminarLibroLogico(idUsuario, idLibro));
     }
 }

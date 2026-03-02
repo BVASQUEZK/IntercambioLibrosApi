@@ -1,7 +1,6 @@
 package com.bardales.intercambiolibrosapi.controller;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,7 +11,6 @@ import com.bardales.intercambiolibrosapi.service.UsuarioService;
 
 @RestController
 @RequestMapping("/api/usuarios")
-@CrossOrigin(origins = "*")
 public class UsuarioAuthController {
 
     private final UsuarioService usuarioService;
@@ -35,13 +33,8 @@ public class UsuarioAuthController {
                 || dni == null || dni.isBlank()) {
             throw new IllegalArgumentException("Faltan campos obligatorios");
         }
-        try {
-            java.util.Map<String, Object> response = usuarioService.registrarUsuario(
-                    nombres, apellidos, correo, clave, dni);
-            return ResponseEntity.status(201).body(response);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        }
+        java.util.Map<String, Object> response = usuarioService.registrarUsuario(
+                nombres, apellidos, correo, clave, dni);
+        return ResponseEntity.status(201).body(response);
     }
 }

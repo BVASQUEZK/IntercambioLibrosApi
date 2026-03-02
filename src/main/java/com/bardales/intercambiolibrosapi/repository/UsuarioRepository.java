@@ -14,8 +14,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
             +
             "u.correo AS correo, u.password AS password, u.estado AS estado "
             +
-            "FROM usuario u WHERE u.correo = :correo AND u.password = :password", nativeQuery = true)
-    List<LoginUsuarioAppProjection> loginUsuarioApp(@Param("correo") String correo, @Param("password") String password);
+            "FROM usuario u WHERE LOWER(u.correo) = LOWER(:correo) LIMIT 1", nativeQuery = true)
+    List<LoginUsuarioAppProjection> loginUsuarioAppByCorreo(@Param("correo") String correo);
 
     @Query(value = "SELECT COALESCE(AVG(r.puntuacion), 0) FROM resena r WHERE r.id_evaluado = :idUsuario", nativeQuery = true)
     Double obtenerValoracion(@Param("idUsuario") Integer idUsuario);
@@ -29,4 +29,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
             @Param("nombres") String nombres,
             @Param("apellidos") String apellidos,
             @Param("urlFoto") String urlFoto);
+
+    @Modifying
+    @Query(value = "UPDATE usuario SET password = :password WHERE id_usuario = :idUsuario", nativeQuery = true)
+    int actualizarPassword(@Param("idUsuario") Integer idUsuario, @Param("password") String password);
 }

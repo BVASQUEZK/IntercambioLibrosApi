@@ -8,6 +8,7 @@ import com.bardales.intercambiolibrosapi.exception.ForbiddenException;
 import com.bardales.intercambiolibrosapi.exception.ResourceNotFoundException;
 import com.bardales.intercambiolibrosapi.exception.UnauthorizedException;
 import com.bardales.intercambiolibrosapi.repository.UsuarioRepository;
+import com.bardales.intercambiolibrosapi.security.JwtService;
 import com.bardales.intercambiolibrosapi.service.UsuarioService;
 
 import jakarta.annotation.PostConstruct;
@@ -15,10 +16,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +29,18 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public UsuarioServiceImpl(UsuarioRepository usuarioRepository, JdbcTemplate jdbcTemplate) {
+    public UsuarioServiceImpl(
+            UsuarioRepository usuarioRepository,
+            JdbcTemplate jdbcTemplate,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService) {
         this.usuarioRepository = usuarioRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @PostConstruct
@@ -46,9 +55,14 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
+    @Transactional
     public LoginResponseDTO login(String correo, String password) {
+        String correoNormalizado = correo == null ? "" : correo.trim();
+        if (correoNormalizado.isBlank() || password == null || password.isBlank()) {
+            throw new UnauthorizedException("Credenciales invalidas");
+        }
         List<com.bardales.intercambiolibrosapi.repository.LoginUsuarioAppProjection> rows =
-                usuarioRepository.loginUsuarioApp(correo, password);
+                usuarioRepository.loginUsuarioAppByCorreo(correoNormalizado);
         if (rows == null || rows.isEmpty()) {
             throw new UnauthorizedException("Credenciales invalidas");
         }
@@ -60,6 +74,23 @@ public class UsuarioServiceImpl implements UsuarioService {
         if (estado != null && !"activo".equalsIgnoreCase(estado)) {
             throw new ForbiddenException("Usuario suspendido");
         }
+        if (idUsuario == null || idUsuario <= 0) {
+            throw new UnauthorizedException("Credenciales invalidas");
+        }
+        String storedPassword = row.getPassword();
+        if (storedPassword == null || storedPassword.isBlank()) {
+            throw new UnauthorizedException("Credenciales invalidas");
+        }
+        boolean passwordOk = isBcryptHash(storedPassword)
+                ? passwordEncoder.matches(password, storedPassword)
+                : Objects.equals(storedPassword, password);
+        if (!passwordOk) {
+            throw new UnauthorizedException("Credenciales invalidas");
+        }
+        if (!isBcryptHash(storedPassword) && idUsuario != null) {
+            usuarioRepository.actualizarPassword(idUsuario, passwordEncoder.encode(password));
+        }
+
         String nombre = null;
         if (nombres != null && apellidos != null) {
             nombre = (nombres + " " + apellidos).trim();
@@ -68,8 +99,8 @@ public class UsuarioServiceImpl implements UsuarioService {
         } else if (apellidos != null) {
             nombre = apellidos;
         }
-        String token = UUID.randomUUID().toString();
-        return new LoginResponseDTO(idUsuario == null ? null : idUsuario.intValue(), nombre, token);
+        String token = jwtService.generateToken(idUsuario.intValue());
+        return new LoginResponseDTO(idUsuario.intValue(), nombre, token);
     }
 
     @Override
@@ -228,10 +259,12 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public Map<String, Object> registrarUsuario(String nombres, String apellidos, String correo, String clave, String dni) {
         try {
+            String correoNormalizado = correo == null ? null : correo.trim().toLowerCase();
+            String passwordHash = passwordEncoder.encode(clave);
             Integer idUsuario = jdbcTemplate.queryForObject(
                     "INSERT INTO usuario (nombres, apellidos, correo, password, dni, puntos) VALUES (?, ?, ?, ?, ?, 1) RETURNING id_usuario",
                     Integer.class,
-                    nombres, apellidos, correo, clave, dni);
+                    nombres, apellidos, correoNormalizado, passwordHash, dni);
 
             if (idUsuario == null || idUsuario <= 0) {
                 throw new ResourceNotFoundException("No se pudo registrar el usuario");
@@ -240,5 +273,9 @@ public class UsuarioServiceImpl implements UsuarioService {
         } catch (DataIntegrityViolationException ex) {
             throw new ResourceNotFoundException("Correo o DNI ya registrado");
         }
+    }
+
+    private boolean isBcryptHash(String password) {
+        return password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$");
     }
 }
