@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS detalle_solicitud CASCADE;
 DROP TABLE IF EXISTS solicitud CASCADE;
 DROP TABLE IF EXISTS disponibilidad_libro CASCADE;
 DROP TABLE IF EXISTS imagen_libro CASCADE;
+DROP TABLE IF EXISTS libro_categoria CASCADE;
 DROP TABLE IF EXISTS libro CASCADE;
 DROP TABLE IF EXISTS categoria CASCADE;
 DROP TABLE IF EXISTS ubicacion CASCADE;
@@ -68,6 +69,15 @@ CREATE TABLE libro (
     disponible BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT ck_libro_estado CHECK (estado IN ('nuevo', 'muy bueno', 'bueno', 'aceptable'))
+);
+
+-- =========================================
+-- TABLA: libro_categoria (N:N)
+-- =========================================
+CREATE TABLE libro_categoria (
+    id_libro INT NOT NULL REFERENCES libro(id_libro) ON DELETE CASCADE,
+    id_categoria INT NOT NULL REFERENCES categoria(id_categoria) ON DELETE CASCADE,
+    PRIMARY KEY (id_libro, id_categoria)
 );
 
 -- =========================================

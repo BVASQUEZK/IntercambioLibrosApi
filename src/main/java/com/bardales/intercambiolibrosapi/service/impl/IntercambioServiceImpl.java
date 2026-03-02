@@ -1,6 +1,7 @@
 package com.bardales.intercambiolibrosapi.service.impl;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -48,19 +49,25 @@ public class IntercambioServiceImpl implements IntercambioService {
             throw new UnauthorizedException("El libro no está disponible");
         }
 
-        Integer idSolicitud = jdbcTemplate.queryForObject(
+        Optional<Integer> solicitudExistente = buscarSolicitudActiva(
+                idUsuarioSolicitante,
+                libro.getIdUsuario(),
+                dto.getIdLibroInteresado());
+        Integer idSolicitud = solicitudExistente.orElseGet(() -> jdbcTemplate.queryForObject(
                 "INSERT INTO solicitud (id_solicitante, id_receptor, tipo, estado) VALUES (?, ?, 'intercambio', 'pendiente') RETURNING id_solicitud",
                 Integer.class,
                 idUsuarioSolicitante,
-                libro.getIdUsuario());
+                libro.getIdUsuario()));
 
         if (idSolicitud == null || idSolicitud <= 0) {
             throw new RuntimeException("No se pudo crear la solicitud de intercambio");
         }
 
-        jdbcTemplate.update(
-                "INSERT INTO detalle_solicitud (id_solicitud, id_libro, propietario) VALUES (?, ?, 'receptor')",
-                idSolicitud, dto.getIdLibroInteresado());
+        if (solicitudExistente.isEmpty()) {
+            jdbcTemplate.update(
+                    "INSERT INTO detalle_solicitud (id_solicitud, id_libro, propietario) VALUES (?, ?, 'receptor')",
+                    idSolicitud, dto.getIdLibroInteresado());
+        }
 
         if (dto.getMensajePropuesta() != null && !dto.getMensajePropuesta().isBlank()) {
             jdbcTemplate.update(
@@ -69,6 +76,23 @@ public class IntercambioServiceImpl implements IntercambioService {
         }
 
         return idSolicitud;
+    }
+
+    private Optional<Integer> buscarSolicitudActiva(int idSolicitante, int idReceptor, int idLibroReceptor) {
+        List<Integer> ids = jdbcTemplate.query(
+                "SELECT s.id_solicitud "
+                        + "FROM solicitud s "
+                        + "INNER JOIN detalle_solicitud ds ON ds.id_solicitud = s.id_solicitud "
+                        + "WHERE s.id_solicitante = ? AND s.id_receptor = ? "
+                        + "AND ds.id_libro = ? AND ds.propietario = 'receptor' "
+                        + "AND s.estado IN ('pendiente', 'aceptado') "
+                        + "ORDER BY s.fecha_solicitud DESC LIMIT 1",
+                (rs, rowNum) -> rs.getInt(1),
+                idSolicitante, idReceptor, idLibroReceptor);
+        if (ids.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(ids.get(0));
     }
 
     @Override

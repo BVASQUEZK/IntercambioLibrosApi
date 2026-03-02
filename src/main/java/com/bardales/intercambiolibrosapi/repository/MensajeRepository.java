@@ -23,4 +23,9 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Integer> {
     void enviarMensaje(@Param("idSolicitud") Integer idSolicitud,
             @Param("idEmisor") Integer idEmisor,
             @Param("contenido") String contenido);
+
+    @Query(value = "SELECT COUNT(1) FROM solicitud s "
+            + "WHERE s.id_solicitud = :idSolicitud "
+            + "AND (s.id_solicitante = :idUsuario OR s.id_receptor = :idUsuario)", nativeQuery = true)
+    Integer existeParticipante(@Param("idSolicitud") Integer idSolicitud, @Param("idUsuario") Integer idUsuario);
 }

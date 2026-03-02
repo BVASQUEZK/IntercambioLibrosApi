@@ -14,6 +14,10 @@ public class UsuarioUpdateDTO {
     private String apellidos;
 
     private String urlFoto;
+    private Double latitud;
+    private Double longitud;
+    private String distrito;
+    private String departamento;
 
     public UsuarioUpdateDTO() {
     }
@@ -55,5 +59,37 @@ public class UsuarioUpdateDTO {
 
     public void setUrlFoto(String urlFoto) {
         this.urlFoto = urlFoto;
+    }
+
+    public Double getLatitud() {
+        return latitud;
+    }
+
+    public void setLatitud(Double latitud) {
+        this.latitud = latitud;
+    }
+
+    public Double getLongitud() {
+        return longitud;
+    }
+
+    public void setLongitud(Double longitud) {
+        this.longitud = longitud;
+    }
+
+    public String getDistrito() {
+        return distrito;
+    }
+
+    public void setDistrito(String distrito) {
+        this.distrito = distrito;
+    }
+
+    public String getDepartamento() {
+        return departamento;
+    }
+
+    public void setDepartamento(String departamento) {
+        this.departamento = departamento;
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.bardales.intercambiolibrosapi.dto.MensajeDTO;
 import com.bardales.intercambiolibrosapi.dto.MensajeEnviarDTO;
+import com.bardales.intercambiolibrosapi.exception.ForbiddenException;
 import com.bardales.intercambiolibrosapi.repository.MensajeProjection;
 import com.bardales.intercambiolibrosapi.repository.MensajeRepository;
 import com.bardales.intercambiolibrosapi.service.MensajeService;
@@ -23,6 +24,7 @@ public class MensajeServiceImpl implements MensajeService {
 
     @Override
     public List<MensajeDTO> listarMensajes(int idSolicitud, int idUsuario) {
+        validarParticipante(idSolicitud, idUsuario);
         return mensajeRepository.listarMensajes(idSolicitud)
                 .stream()
                 .map(p -> toDto(p, idUsuario))
@@ -31,8 +33,19 @@ public class MensajeServiceImpl implements MensajeService {
 
     @Override
     @Transactional
-    public void enviarMensaje(MensajeEnviarDTO dto) {
+    public void enviarMensaje(MensajeEnviarDTO dto, int idUsuarioAuth) {
+        if (dto.getIdEmisor() == null || dto.getIdEmisor() != idUsuarioAuth) {
+            throw new ForbiddenException("No autorizado para enviar mensaje con otro emisor");
+        }
+        validarParticipante(dto.getIdSolicitud(), idUsuarioAuth);
         mensajeRepository.enviarMensaje(dto.getIdSolicitud(), dto.getIdEmisor(), dto.getContenido());
+    }
+
+    private void validarParticipante(int idSolicitud, int idUsuario) {
+        Integer existe = mensajeRepository.existeParticipante(idSolicitud, idUsuario);
+        if (existe == null || existe == 0) {
+            throw new ForbiddenException("No autorizado para acceder a esta solicitud");
+        }
     }
 
     private MensajeDTO toDto(MensajeProjection p, int idUsuario) {

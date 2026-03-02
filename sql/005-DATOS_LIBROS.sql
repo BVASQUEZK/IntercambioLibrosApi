@@ -96,6 +96,12 @@ SELECT
     'Didactica Moderna', 'C. Herrera', 'Metodos activos y evaluacion formativa.', 'muy bueno', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM libro WHERE titulo = 'Didactica Moderna');
 
+INSERT INTO libro_categoria (id_libro, id_categoria)
+SELECT l.id_libro, l.id_categoria
+FROM libro l
+WHERE l.id_categoria IS NOT NULL
+ON CONFLICT DO NOTHING;
+
 -- Imagenes de portada
 INSERT INTO imagen_libro (id_libro, url_imagen)
 SELECT (SELECT id_libro FROM libro WHERE titulo = 'La Casa en la Niebla'), 'https://picsum.photos/seed/libro1/600/900'

@@ -6,6 +6,7 @@ public class LibroCreadoDTO {
     private Integer idLibro;
     private Integer idUsuario;
     private Integer idCategoria;
+    private List<Integer> idCategorias;
     private String titulo;
     private String autor;
     private String descripcion;
@@ -16,11 +17,12 @@ public class LibroCreadoDTO {
     public LibroCreadoDTO() {
     }
 
-    public LibroCreadoDTO(Integer idLibro, Integer idUsuario, Integer idCategoria, String titulo, String autor,
+    public LibroCreadoDTO(Integer idLibro, Integer idUsuario, Integer idCategoria, List<Integer> idCategorias, String titulo, String autor,
             String descripcion, String estado, String ubicacion, List<String> urlsImagenes) {
         this.idLibro = idLibro;
         this.idUsuario = idUsuario;
         this.idCategoria = idCategoria;
+        this.idCategorias = idCategorias;
         this.titulo = titulo;
         this.autor = autor;
         this.descripcion = descripcion;
@@ -51,6 +53,14 @@ public class LibroCreadoDTO {
 
     public void setIdCategoria(Integer idCategoria) {
         this.idCategoria = idCategoria;
+    }
+
+    public List<Integer> getIdCategorias() {
+        return idCategorias;
+    }
+
+    public void setIdCategorias(List<Integer> idCategorias) {
+        this.idCategorias = idCategorias;
     }
 
     public String getTitulo() {

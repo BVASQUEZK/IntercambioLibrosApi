@@ -10,8 +10,10 @@ import com.bardales.intercambiolibrosapi.exception.UnauthorizedException;
 import com.bardales.intercambiolibrosapi.repository.UsuarioRepository;
 import com.bardales.intercambiolibrosapi.service.UsuarioService;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,12 +65,17 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario usuario = usuarioRepository.findById(idUsuario)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         Double promedio = usuarioRepository.obtenerValoracion(idUsuario);
+        Map<String, Object> ubicacion = obtenerUbicacionPerfil(idUsuario);
         return new PerfilUsuarioDTO(
                 usuario.getNombres(),
                 usuario.getApellidos(),
                 usuario.getUrlFotoPerfil(),
                 usuario.getFechaRegistro(),
-                promedio == null ? 0.0 : promedio);
+                promedio == null ? 0.0 : promedio,
+                toDouble(ubicacion.get("latitud")),
+                toDouble(ubicacion.get("longitud")),
+                toStringOrNull(ubicacion.get("distrito")),
+                toStringOrNull(ubicacion.get("departamento")));
     }
 
     @Override
@@ -88,6 +95,19 @@ public class UsuarioServiceImpl implements UsuarioService {
                 dto.getUrlFoto()
         );
 
+        boolean shouldUpdateUbicacion = dto.getLatitud() != null
+                || dto.getLongitud() != null
+                || notBlank(dto.getDistrito())
+                || notBlank(dto.getDepartamento());
+        if (shouldUpdateUbicacion) {
+            upsertUbicacion(
+                    dto.getIdUsuario(),
+                    dto.getLatitud(),
+                    dto.getLongitud(),
+                    normalizeBlank(dto.getDistrito()),
+                    normalizeBlank(dto.getDepartamento()));
+        }
+
         Usuario usuario = usuarioRepository.findById(dto.getIdUsuario())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         String urlFoto = usuario.getUrlFotoPerfil();
@@ -95,6 +115,85 @@ public class UsuarioServiceImpl implements UsuarioService {
             urlFoto = "default_user.png";
         }
         return new LoginResponseDTO(usuario.getNombres(), usuario.getApellidos(), urlFoto);
+    }
+
+    private Map<String, Object> obtenerUbicacionPerfil(int idUsuario) {
+        return jdbcTemplate.query(
+                "SELECT latitud AS latitud, longitud AS longitud, "
+                        + "direccion AS distrito, ciudad AS departamento "
+                        + "FROM ubicacion WHERE id_usuario = ? "
+                        + "ORDER BY fecha_actualizacion DESC NULLS LAST, id_ubicacion DESC LIMIT 1",
+                rs -> {
+                    if (rs.next()) {
+                        Map<String, Object> row = new HashMap<>();
+                        row.put("latitud", rs.getObject("latitud"));
+                        row.put("longitud", rs.getObject("longitud"));
+                        row.put("distrito", rs.getString("distrito"));
+                        row.put("departamento", rs.getString("departamento"));
+                        return row;
+                    }
+                    return Map.of();
+                },
+                idUsuario);
+    }
+
+    private void upsertUbicacion(
+            int idUsuario,
+            Double latitud,
+            Double longitud,
+            String distrito,
+            String departamento) {
+        Integer idUbicacion = jdbcTemplate.query(
+                "SELECT id_ubicacion FROM ubicacion WHERE id_usuario = ? "
+                        + "ORDER BY fecha_actualizacion DESC NULLS LAST, id_ubicacion DESC LIMIT 1",
+                rs -> rs.next() ? rs.getInt(1) : null,
+                idUsuario);
+
+        if (idUbicacion == null) {
+            jdbcTemplate.update(
+                    "INSERT INTO ubicacion (id_usuario, latitud, longitud, direccion, ciudad, fecha_actualizacion) "
+                            + "VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                    idUsuario, latitud, longitud, distrito, departamento);
+        } else {
+            jdbcTemplate.update(
+                    "UPDATE ubicacion SET latitud = ?, longitud = ?, direccion = ?, ciudad = ?, "
+                            + "fecha_actualizacion = CURRENT_TIMESTAMP WHERE id_ubicacion = ?",
+                    latitud, longitud, distrito, departamento, idUbicacion);
+        }
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String normalizeBlank(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private Double toDouble(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Number number) {
+            return number.doubleValue();
+        }
+        try {
+            return Double.parseDouble(Objects.toString(raw));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String toStringOrNull(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = Objects.toString(raw, "").trim();
+        return value.isEmpty() ? null : value;
     }
 
     @Override

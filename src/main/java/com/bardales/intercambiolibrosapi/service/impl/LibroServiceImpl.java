@@ -1,6 +1,7 @@
 package com.bardales.intercambiolibrosapi.service.impl;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,14 +40,30 @@ public class LibroServiceImpl implements LibroService {
     }
 
     @Override
-    public List<LibroDTO> buscarLibros(String query, Integer idCategoria, String estado, int pagina, int cantidad) {
+    public List<LibroDTO> buscarLibros(
+            String query,
+            Integer idCategoria,
+            String estado,
+            Integer idUsuario,
+            String alcance,
+            int pagina,
+            int cantidad) {
         int safePagina = Math.max(pagina, 1);
         int safeCantidad = Math.max(cantidad, 1);
         int offset = (safePagina - 1) * safeCantidad;
         String filtro = (query == null || query.isBlank()) ? null : query.trim();
         String estadoFiltro = (estado == null || estado.isBlank()) ? null : estado.trim();
+        String alcanceNormalizado = (alcance == null || alcance.isBlank()) ? "amplia" : alcance.trim().toLowerCase();
 
-        return libroRepository.buscarLibros(filtro, filtro, idCategoria, estadoFiltro, safeCantidad, offset)
+        return libroRepository.buscarLibros(
+                        filtro,
+                        filtro,
+                        idCategoria,
+                        estadoFiltro,
+                        idUsuario,
+                        alcanceNormalizado,
+                        safeCantidad,
+                        offset)
                 .stream()
                 .map(this::toBusquedaDto)
                 .collect(Collectors.toList());
@@ -56,6 +73,11 @@ public class LibroServiceImpl implements LibroService {
     @Transactional
     public LibroCreadoDTO registrarLibro(int idUsuario, LibroRegistroDTO dto) {
         String estadoNormalizado = normalizarEstado(dto.getEstado());
+        List<Integer> categorias = normalizarCategorias(dto.getIdCategorias(), dto.getIdCategoria());
+        if (categorias.isEmpty()) {
+            throw new RuntimeException("Debes seleccionar al menos una categoria");
+        }
+        Integer categoriaPrincipal = categorias.get(0);
 
         Integer idLibro = jdbcTemplate.queryForObject(
                 "INSERT INTO libro (id_usuario, id_categoria, titulo, autor, descripcion, estado, ubicacion, disponible) "
@@ -63,7 +85,7 @@ public class LibroServiceImpl implements LibroService {
                         "VALUES (?, ?, ?, ?, ?, ?, ?, TRUE) RETURNING id_libro",
                 Integer.class,
                 idUsuario,
-                dto.getIdCategoria(),
+                categoriaPrincipal,
                 dto.getTitulo(),
                 dto.getAutor(),
                 dto.getDescripcion(),
@@ -83,10 +105,15 @@ public class LibroServiceImpl implements LibroService {
             }
         }
 
+        for (Integer idCategoria : categorias) {
+            libroRepository.vincularCategoria(idLibro, idCategoria);
+        }
+
         return new LibroCreadoDTO(
                 idLibro,
                 idUsuario,
-                dto.getIdCategoria(),
+                categoriaPrincipal,
+                categorias,
                 dto.getTitulo(),
                 dto.getAutor(),
                 dto.getDescripcion(),
@@ -111,7 +138,10 @@ public class LibroServiceImpl implements LibroService {
                 p.getId_libro(),
                 p.getTitulo(),
                 p.getAutor(),
-                p.getUrl_portada()
+                p.getUrl_portada(),
+                p.getId_usuario(),
+                p.getDistrito(),
+                p.getDepartamento()
         );
     }
 
@@ -127,5 +157,21 @@ public class LibroServiceImpl implements LibroService {
             return "muy bueno";
         }
         return value;
+    }
+
+    private List<Integer> normalizarCategorias(List<Integer> idCategorias, Integer idCategoria) {
+        List<Integer> categorias = idCategorias == null ? List.of() : idCategorias;
+        List<Integer> depuradas = categorias.stream()
+                .filter(Objects::nonNull)
+                .filter(id -> id > 0)
+                .distinct()
+                .collect(Collectors.toList());
+        if (!depuradas.isEmpty()) {
+            return depuradas;
+        }
+        if (idCategoria != null && idCategoria > 0) {
+            return List.of(idCategoria);
+        }
+        return List.of();
     }
 }

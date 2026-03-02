@@ -7,5 +7,5 @@ import com.bardales.intercambiolibrosapi.dto.MensajeEnviarDTO;
 
 public interface MensajeService {
     List<MensajeDTO> listarMensajes(int idSolicitud, int idUsuario);
-    void enviarMensaje(MensajeEnviarDTO dto);
+    void enviarMensaje(MensajeEnviarDTO dto, int idUsuarioAuth);
 }

@@ -10,7 +10,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -25,8 +25,8 @@ public class Categoria {
     @Column(name = "nombre", length = 100)
     private String nombre;
 
-    @JsonManagedReference
-    @OneToMany(mappedBy = "categoria")
+    @JsonManagedReference(value = "categoria-libro")
+    @ManyToMany(mappedBy = "categorias")
     private List<Libro> libros = new ArrayList<>();
 
     public Categoria() {

@@ -38,8 +38,10 @@ public class MensajeController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> enviar(@Valid @RequestBody MensajeEnviarDTO dto) {
-        mensajeService.enviarMensaje(dto);
+    public ResponseEntity<Map<String, Object>> enviar(
+            @RequestHeader("X-User-Id") int idUsuario,
+            @Valid @RequestBody MensajeEnviarDTO dto) {
+        mensajeService.enviarMensaje(dto, idUsuario);
         return ResponseEntity.status(201)
                 .body(Map.of("mensaje", "Mensaje enviado"));
     }

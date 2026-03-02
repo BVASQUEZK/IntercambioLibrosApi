@@ -122,6 +122,12 @@ FROM usuario u CROSS JOIN categoria c
 WHERE u.correo = 'maria.l@demo.com' AND c.nombre = 'Fantasía'
   AND NOT EXISTS (SELECT 1 FROM libro l WHERE l.id_usuario = u.id_usuario AND l.titulo = 'El Hobbit');
 
+INSERT INTO libro_categoria (id_libro, id_categoria)
+SELECT l.id_libro, l.id_categoria
+FROM libro l
+WHERE l.id_categoria IS NOT NULL
+ON CONFLICT DO NOTHING;
+
 -- =========================================
 -- IMAGENES DE LIBROS
 -- =========================================

@@ -22,6 +22,9 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
     void actualizarEstado(@Param("idSolicitud") Integer idSolicitud, @Param("estado") String estado);
 
     @Query(value = "SELECT s.id_solicitud AS id_solicitud, "
+            + "s.id_solicitante AS id_solicitante, "
+            + "s.id_receptor AS id_receptor, "
+            + "l.id_libro AS id_libro, "
             + "l.titulo AS titulo_libro, "
             + "CASE WHEN s.id_solicitante = :idUsuario "
             + "THEN CONCAT(ur.nombres, ' ', ur.apellidos) "

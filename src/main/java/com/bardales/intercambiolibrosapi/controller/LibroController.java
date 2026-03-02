@@ -43,9 +43,11 @@ public class LibroController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Integer idCategoria,
             @RequestParam(required = false) String estado,
+            @RequestParam(required = false) Integer idUsuario,
+            @RequestParam(defaultValue = "amplia") String alcance,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return libroService.buscarLibros(query, idCategoria, estado, page, size);
+        return libroService.buscarLibros(query, idCategoria, estado, idUsuario, alcance, page, size);
     }
 
     @PostMapping("/registrar")

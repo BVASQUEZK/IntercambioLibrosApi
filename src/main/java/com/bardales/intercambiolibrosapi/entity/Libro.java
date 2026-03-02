@@ -12,8 +12,8 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
@@ -29,10 +29,14 @@ public class Libro {
     @Column(name = "id_usuario", nullable = false)
     private Integer idUsuario;
 
-    @JsonBackReference
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_categoria")
-    private Categoria categoria;
+    @JsonBackReference(value = "categoria-libro")
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "libro_categoria",
+            joinColumns = @jakarta.persistence.JoinColumn(name = "id_libro"),
+            inverseJoinColumns = @jakarta.persistence.JoinColumn(name = "id_categoria")
+    )
+    private List<Categoria> categorias = new ArrayList<>();
 
     @Column(name = "titulo", nullable = false, length = 150)
     private String titulo;
@@ -61,12 +65,12 @@ public class Libro {
     public Libro() {
     }
 
-    public Libro(Integer idLibro, Integer idUsuario, Categoria categoria, String titulo, String autor,
+    public Libro(Integer idLibro, Integer idUsuario, List<Categoria> categorias, String titulo, String autor,
             String descripcion, String estado, String ubicacion, Boolean disponible, LocalDateTime fechaRegistro,
             List<ImagenLibro> imagenes) {
         this.idLibro = idLibro;
         this.idUsuario = idUsuario;
-        this.categoria = categoria;
+        this.categorias = categorias;
         this.titulo = titulo;
         this.autor = autor;
         this.descripcion = descripcion;
@@ -93,12 +97,12 @@ public class Libro {
         this.idUsuario = idUsuario;
     }
 
-    public Categoria getCategoria() {
-        return categoria;
+    public List<Categoria> getCategorias() {
+        return categorias;
     }
 
-    public void setCategoria(Categoria categoria) {
-        this.categoria = categoria;
+    public void setCategorias(List<Categoria> categorias) {
+        this.categorias = categorias;
     }
 
     public String getTitulo() {

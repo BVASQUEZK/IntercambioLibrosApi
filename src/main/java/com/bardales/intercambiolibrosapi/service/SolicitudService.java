@@ -8,5 +8,5 @@ import com.bardales.intercambiolibrosapi.dto.SolicitudResumenDTO;
 public interface SolicitudService {
     Integer registrarSolicitud(SolicitudCrearDTO dto);
     List<SolicitudResumenDTO> listarPorUsuario(int idUsuario);
-    void actualizarEstado(int idSolicitud, String nuevoEstado);
+    void actualizarEstado(int idSolicitud, String nuevoEstado, int idUsuario);
 }

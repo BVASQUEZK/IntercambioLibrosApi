@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 
 public class SolicitudResumenDTO {
     private Integer idSolicitud;
+    private Integer idSolicitante;
+    private Integer idReceptor;
+    private Integer idLibro;
     private String tituloLibro;
     private String nombreContraparte;
     private String tipo;
@@ -14,9 +17,13 @@ public class SolicitudResumenDTO {
     public SolicitudResumenDTO() {
     }
 
-    public SolicitudResumenDTO(Integer idSolicitud, String tituloLibro, String nombreContraparte, String tipo,
+    public SolicitudResumenDTO(Integer idSolicitud, Integer idSolicitante, Integer idReceptor, Integer idLibro,
+            String tituloLibro, String nombreContraparte, String tipo,
             String estado, LocalDateTime fechaSolicitud, String urlImagen) {
         this.idSolicitud = idSolicitud;
+        this.idSolicitante = idSolicitante;
+        this.idReceptor = idReceptor;
+        this.idLibro = idLibro;
         this.tituloLibro = tituloLibro;
         this.nombreContraparte = nombreContraparte;
         this.tipo = tipo;
@@ -31,6 +38,30 @@ public class SolicitudResumenDTO {
 
     public void setIdSolicitud(Integer idSolicitud) {
         this.idSolicitud = idSolicitud;
+    }
+
+    public Integer getIdSolicitante() {
+        return idSolicitante;
+    }
+
+    public void setIdSolicitante(Integer idSolicitante) {
+        this.idSolicitante = idSolicitante;
+    }
+
+    public Integer getIdReceptor() {
+        return idReceptor;
+    }
+
+    public void setIdReceptor(Integer idReceptor) {
+        this.idReceptor = idReceptor;
+    }
+
+    public Integer getIdLibro() {
+        return idLibro;
+    }
+
+    public void setIdLibro(Integer idLibro) {
+        this.idLibro = idLibro;
     }
 
     public String getTituloLibro() {

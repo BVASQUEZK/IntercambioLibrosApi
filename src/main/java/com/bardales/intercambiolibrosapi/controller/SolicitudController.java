@@ -49,13 +49,14 @@ public class SolicitudController {
     @PatchMapping("/{id}/estado")
     public ResponseEntity<Map<String, Object>> actualizarEstado(
             @PathVariable("id") int idSolicitud,
+            @RequestHeader("X-User-Id") int idUsuario,
             @RequestParam("estado") String nuevoEstado) {
         String estado = nuevoEstado == null ? "" : nuevoEstado.trim().toLowerCase();
         if (!ESTADOS_PERMITIDOS.contains(estado)) {
             return ResponseEntity.badRequest()
                     .body(Map.of("mensaje", "Estado inválido", "estado", nuevoEstado));
         }
-        solicitudService.actualizarEstado(idSolicitud, estado);
+        solicitudService.actualizarEstado(idSolicitud, estado, idUsuario);
         return ResponseEntity.ok(Map.of("mensaje", "Estado actualizado", "id_solicitud", idSolicitud));
     }
 }
