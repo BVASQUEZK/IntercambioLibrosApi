@@ -1,7 +1,10 @@
 package com.bardales.intercambiolibrosapi.service.impl;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import jakarta.annotation.PostConstruct;
@@ -12,10 +15,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bardales.intercambiolibrosapi.dto.LibroActualizarDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroCreadoDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroHomeDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroRegistroDTO;
+import com.bardales.intercambiolibrosapi.entity.Libro;
+import com.bardales.intercambiolibrosapi.exception.ResourceNotFoundException;
 import com.bardales.intercambiolibrosapi.repository.LibroHomeProjection;
 import com.bardales.intercambiolibrosapi.repository.LibroRepository;
 import com.bardales.intercambiolibrosapi.service.LibroService;
@@ -48,6 +54,15 @@ public class LibroServiceImpl implements LibroService {
                             + "WHERE l.id_categoria IS NOT NULL "
                             + "ON CONFLICT DO NOTHING");
             jdbcTemplate.execute("ALTER TABLE IF EXISTS imagen_libro ALTER COLUMN url_imagen TYPE TEXT");
+
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ADD COLUMN IF NOT EXISTS situacion VARCHAR(30)");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ADD COLUMN IF NOT EXISTS estado_logico VARCHAR(20)");
+            jdbcTemplate.update(
+                    "UPDATE libro SET situacion = CASE WHEN COALESCE(disponible, TRUE) THEN 'disponible' ELSE 'ocupado' END "
+                            + "WHERE situacion IS NULL OR TRIM(situacion) = ''");
+            jdbcTemplate.update("UPDATE libro SET estado_logico = 'activo' WHERE estado_logico IS NULL OR TRIM(estado_logico) = ''");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ALTER COLUMN situacion SET DEFAULT 'disponible'");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS libro ALTER COLUMN estado_logico SET DEFAULT 'activo'");
         } catch (Exception ex) {
             LOGGER.warn("No se pudieron aplicar ajustes de esquema de libros automaticamente: {}", ex.getMessage());
         }
@@ -79,7 +94,7 @@ public class LibroServiceImpl implements LibroService {
         int offset = (safePagina - 1) * safeCantidad;
         String filtro = (query == null || query.isBlank()) ? null : query.trim();
         String estadoFiltro = (estado == null || estado.isBlank()) ? null : estado.trim();
-        String alcanceNormalizado = (alcance == null || alcance.isBlank()) ? "amplia" : alcance.trim().toLowerCase();
+        String alcanceNormalizado = normalizarAlcance(alcance);
 
         try {
             return libroRepository.buscarLibros(
@@ -118,16 +133,21 @@ public class LibroServiceImpl implements LibroService {
     @Transactional
     public LibroCreadoDTO registrarLibro(int idUsuario, LibroRegistroDTO dto) {
         String estadoNormalizado = normalizarEstado(dto.getEstado());
+        String situacionNormalizada = normalizarSituacion(dto.getSituacion());
+        String estadoLogico = "activo";
+        boolean disponible = esDisponible(situacionNormalizada);
+
         List<Integer> categorias = normalizarCategorias(dto.getIdCategorias(), dto.getIdCategoria());
         if (categorias.isEmpty()) {
             throw new RuntimeException("Debes seleccionar al menos una categoria");
         }
         Integer categoriaPrincipal = categorias.get(0);
 
+        List<String> imagenes = normalizarUrls(dto.getUrlsImagenes());
+
         Integer idLibro = jdbcTemplate.queryForObject(
-                "INSERT INTO libro (id_usuario, id_categoria, titulo, autor, descripcion, estado, ubicacion, disponible) "
-                        +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, TRUE) RETURNING id_libro",
+                "INSERT INTO libro (id_usuario, id_categoria, titulo, autor, descripcion, estado, situacion, estado_logico, ubicacion, disponible) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id_libro",
                 Integer.class,
                 idUsuario,
                 categoriaPrincipal,
@@ -135,19 +155,17 @@ public class LibroServiceImpl implements LibroService {
                 dto.getAutor(),
                 dto.getDescripcion(),
                 estadoNormalizado,
-                dto.getUbicacion());
+                situacionNormalizada,
+                estadoLogico,
+                dto.getUbicacion(),
+                disponible);
 
         if (idLibro == null || idLibro <= 0) {
             throw new RuntimeException("No se pudo registrar el libro");
         }
 
-        if (dto.getUrlsImagenes() != null) {
-            for (String url : dto.getUrlsImagenes()) {
-                if (url == null || url.isBlank()) {
-                    continue;
-                }
-                libroRepository.vincularImagen(idLibro, url.trim());
-            }
+        for (String url : imagenes) {
+            libroRepository.vincularImagen(idLibro, url);
         }
 
         for (Integer idCategoria : categorias) {
@@ -170,9 +188,114 @@ public class LibroServiceImpl implements LibroService {
                 dto.getAutor(),
                 dto.getDescripcion(),
                 estadoNormalizado,
+                situacionNormalizada,
+                estadoLogico,
                 dto.getUbicacion(),
-                dto.getUrlsImagenes()
+                imagenes
         );
+    }
+
+    @Override
+    @Transactional
+    public LibroCreadoDTO actualizarLibro(int idUsuario, int idLibro, LibroActualizarDTO dto) {
+        Libro libro = libroRepository.findByIdLibroAndIdUsuario(idLibro, idUsuario)
+                .orElseThrow(() -> new ResourceNotFoundException("Libro no encontrado"));
+
+        if (!"activo".equalsIgnoreCase(normalizarEstadoLogico(libro.getEstadoLogico()))) {
+            throw new ResourceNotFoundException("El libro esta inactivo y no se puede editar");
+        }
+
+        List<Integer> categoriasNuevas = normalizarCategorias(dto.getIdCategorias(), dto.getIdCategoria());
+        Integer categoriaPrincipal = !categoriasNuevas.isEmpty()
+                ? categoriasNuevas.get(0)
+                : libro.getIdCategoria();
+
+        String titulo = conservarSiVacio(dto.getTitulo(), libro.getTitulo());
+        String autor = conservarSiVacio(dto.getAutor(), libro.getAutor());
+        String descripcion = dto.getDescripcion() == null ? libro.getDescripcion() : valorNullable(dto.getDescripcion());
+        String ubicacion = dto.getUbicacion() == null ? libro.getUbicacion() : valorNullable(dto.getUbicacion());
+
+        String estado = dto.getEstado() == null ? libro.getEstado() : normalizarEstado(dto.getEstado());
+        String situacion = dto.getSituacion() == null
+                ? normalizarSituacion(libro.getSituacion())
+                : normalizarSituacion(dto.getSituacion());
+        boolean disponible = esDisponible(situacion);
+
+        jdbcTemplate.update(
+                "UPDATE libro SET id_categoria = ?, titulo = ?, autor = ?, descripcion = ?, estado = ?, situacion = ?, ubicacion = ?, disponible = ? WHERE id_libro = ?",
+                categoriaPrincipal,
+                titulo,
+                autor,
+                descripcion,
+                estado,
+                situacion,
+                ubicacion,
+                disponible,
+                idLibro);
+
+        if (!categoriasNuevas.isEmpty()) {
+            libroRepository.eliminarCategoriasPorLibro(idLibro);
+            for (Integer idCategoria : categoriasNuevas) {
+                try {
+                    libroRepository.vincularCategoria(idLibro, idCategoria);
+                } catch (DataAccessException ex) {
+                    if (!isMissingLibroCategoria(ex)) {
+                        throw ex;
+                    }
+                    LOGGER.warn("No se pudo actualizar categorias N:N por falta de tabla libro_categoria");
+                }
+            }
+        }
+
+        if (dto.getUrlsImagenes() != null) {
+            List<String> urls = normalizarUrls(dto.getUrlsImagenes());
+            libroRepository.eliminarImagenesPorLibro(idLibro);
+            for (String url : urls) {
+                libroRepository.vincularImagen(idLibro, url);
+            }
+        }
+
+        List<Integer> categoriasDto = categoriasNuevas.isEmpty() ? obtenerCategoriasLibro(idLibro, categoriaPrincipal) : categoriasNuevas;
+        List<String> imagenesDto = obtenerImagenesLibro(idLibro);
+
+        return new LibroCreadoDTO(
+                idLibro,
+                idUsuario,
+                categoriaPrincipal,
+                categoriasDto,
+                titulo,
+                autor,
+                descripcion,
+                estado,
+                situacion,
+                "activo",
+                ubicacion,
+                imagenesDto);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> eliminarLibroLogico(int idUsuario, int idLibro) {
+        Libro libro = libroRepository.findByIdLibroAndIdUsuario(idLibro, idUsuario)
+                .orElseThrow(() -> new ResourceNotFoundException("Libro no encontrado"));
+
+        if ("inactivo".equalsIgnoreCase(normalizarEstadoLogico(libro.getEstadoLogico()))) {
+            return Map.of(
+                    "mensaje", "El libro ya estaba inactivo",
+                    "idLibro", idLibro,
+                    "estadoLogico", "inactivo");
+        }
+
+        jdbcTemplate.update(
+                "UPDATE libro SET estado_logico = 'inactivo', situacion = 'ocupado', disponible = FALSE WHERE id_libro = ? AND id_usuario = ?",
+                idLibro,
+                idUsuario);
+
+        return Map.of(
+                "mensaje", "Libro eliminado logicamente",
+                "idLibro", idLibro,
+                "estadoLogico", "inactivo",
+                "situacion", "ocupado");
     }
 
     private LibroHomeDTO toDto(LibroHomeProjection p) {
@@ -191,6 +314,7 @@ public class LibroServiceImpl implements LibroService {
                 p.getTitulo(),
                 p.getAutor(),
                 p.getUrl_portada(),
+                p.getSituacion(),
                 p.getId_usuario(),
                 p.getDistrito(),
                 p.getDepartamento()
@@ -211,6 +335,48 @@ public class LibroServiceImpl implements LibroService {
         return value;
     }
 
+    private String normalizarAlcance(String alcance) {
+        if (alcance == null || alcance.isBlank()) {
+            return "internacional";
+        }
+        String value = alcance.trim().toLowerCase();
+        if ("amplia".equals(value)) {
+            return "internacional";
+        }
+        if (!"local".equals(value) && !"nacional".equals(value) && !"internacional".equals(value)) {
+            return "internacional";
+        }
+        return value;
+    }
+
+    private String normalizarSituacion(String situacion) {
+        if (situacion == null || situacion.isBlank()) {
+            return "disponible";
+        }
+        String value = situacion.trim().toLowerCase();
+        if ("libre".equals(value)) {
+            return "disponible";
+        }
+        if ("no disponible".equals(value) || "reservado".equals(value)) {
+            return "ocupado";
+        }
+        if (!"disponible".equals(value) && !"ocupado".equals(value)) {
+            return "disponible";
+        }
+        return value;
+    }
+
+    private String normalizarEstadoLogico(String estadoLogico) {
+        if (estadoLogico == null || estadoLogico.isBlank()) {
+            return "activo";
+        }
+        return estadoLogico.trim().toLowerCase();
+    }
+
+    private boolean esDisponible(String situacion) {
+        return "disponible".equalsIgnoreCase(normalizarSituacion(situacion));
+    }
+
     private List<Integer> normalizarCategorias(List<Integer> idCategorias, Integer idCategoria) {
         List<Integer> categorias = idCategorias == null ? List.of() : idCategorias;
         List<Integer> depuradas = categorias.stream()
@@ -225,6 +391,69 @@ public class LibroServiceImpl implements LibroService {
             return List.of(idCategoria);
         }
         return List.of();
+    }
+
+    private List<String> normalizarUrls(List<String> urls) {
+        if (urls == null) {
+            return List.of();
+        }
+        Set<String> depuradas = new LinkedHashSet<>();
+        for (String url : urls) {
+            if (url == null) {
+                continue;
+            }
+            String valor = url.trim();
+            if (!valor.isEmpty()) {
+                depuradas.add(valor);
+            }
+        }
+        return List.copyOf(depuradas);
+    }
+
+    private List<String> obtenerImagenesLibro(int idLibro) {
+        return jdbcTemplate.query(
+                "SELECT url_imagen FROM imagen_libro WHERE id_libro = ? ORDER BY id_imagen",
+                (rs, rowNum) -> rs.getString("url_imagen"),
+                idLibro);
+    }
+
+    private List<Integer> obtenerCategoriasLibro(int idLibro, Integer categoriaPrincipal) {
+        try {
+            List<Integer> categorias = jdbcTemplate.queryForList(
+                    "SELECT id_categoria FROM libro_categoria WHERE id_libro = ? ORDER BY id_categoria",
+                    Integer.class,
+                    idLibro);
+            if (!categorias.isEmpty()) {
+                return categorias;
+            }
+        } catch (DataAccessException ex) {
+            if (!isMissingLibroCategoria(ex)) {
+                throw ex;
+            }
+        }
+        if (categoriaPrincipal != null) {
+            return List.of(categoriaPrincipal);
+        }
+        return List.of();
+    }
+
+    private String conservarSiVacio(String nuevoValor, String valorActual) {
+        if (nuevoValor == null) {
+            return valorActual;
+        }
+        String valor = nuevoValor.trim();
+        if (valor.isEmpty()) {
+            return valorActual;
+        }
+        return valor;
+    }
+
+    private String valorNullable(String value) {
+        String normalized = value == null ? null : value.trim();
+        if (normalized == null || normalized.isEmpty()) {
+            return null;
+        }
+        return normalized;
     }
 
     private boolean isMissingLibroCategoria(Throwable ex) {

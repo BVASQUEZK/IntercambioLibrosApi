@@ -65,10 +65,14 @@ CREATE TABLE libro (
     autor VARCHAR(150),
     descripcion TEXT,
     estado VARCHAR(20),
+    situacion VARCHAR(30) NOT NULL DEFAULT 'disponible',
+    estado_logico VARCHAR(20) NOT NULL DEFAULT 'activo',
     ubicacion VARCHAR(255),
     disponible BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT ck_libro_estado CHECK (estado IN ('nuevo', 'muy bueno', 'bueno', 'aceptable'))
+    CONSTRAINT ck_libro_estado CHECK (estado IN ('nuevo', 'muy bueno', 'bueno', 'aceptable')),
+    CONSTRAINT ck_libro_situacion CHECK (situacion IN ('disponible', 'ocupado')),
+    CONSTRAINT ck_libro_estado_logico CHECK (estado_logico IN ('activo', 'inactivo'))
 );
 
 -- =========================================

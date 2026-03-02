@@ -15,6 +15,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 
 @Entity
@@ -28,6 +29,9 @@ public class Libro {
 
     @Column(name = "id_usuario", nullable = false)
     private Integer idUsuario;
+
+    @Column(name = "id_categoria")
+    private Integer idCategoria;
 
     @JsonBackReference(value = "categoria-libro")
     @ManyToMany(fetch = FetchType.LAZY)
@@ -50,6 +54,12 @@ public class Libro {
     @Column(name = "estado")
     private String estado;
 
+    @Column(name = "situacion")
+    private String situacion;
+
+    @Column(name = "estado_logico")
+    private String estadoLogico;
+
     @Column(name = "ubicacion")
     private String ubicacion;
 
@@ -60,21 +70,25 @@ public class Libro {
     private LocalDateTime fechaRegistro;
 
     @OneToMany(mappedBy = "libro", fetch = FetchType.LAZY)
+    @OrderBy("idImagen ASC")
     private List<ImagenLibro> imagenes = new ArrayList<>();
 
     public Libro() {
     }
 
-    public Libro(Integer idLibro, Integer idUsuario, List<Categoria> categorias, String titulo, String autor,
-            String descripcion, String estado, String ubicacion, Boolean disponible, LocalDateTime fechaRegistro,
-            List<ImagenLibro> imagenes) {
+    public Libro(Integer idLibro, Integer idUsuario, Integer idCategoria, List<Categoria> categorias, String titulo, String autor,
+            String descripcion, String estado, String situacion, String estadoLogico, String ubicacion,
+            Boolean disponible, LocalDateTime fechaRegistro, List<ImagenLibro> imagenes) {
         this.idLibro = idLibro;
         this.idUsuario = idUsuario;
+        this.idCategoria = idCategoria;
         this.categorias = categorias;
         this.titulo = titulo;
         this.autor = autor;
         this.descripcion = descripcion;
         this.estado = estado;
+        this.situacion = situacion;
+        this.estadoLogico = estadoLogico;
         this.ubicacion = ubicacion;
         this.disponible = disponible;
         this.fechaRegistro = fechaRegistro;
@@ -95,6 +109,14 @@ public class Libro {
 
     public void setIdUsuario(Integer idUsuario) {
         this.idUsuario = idUsuario;
+    }
+
+    public Integer getIdCategoria() {
+        return idCategoria;
+    }
+
+    public void setIdCategoria(Integer idCategoria) {
+        this.idCategoria = idCategoria;
     }
 
     public List<Categoria> getCategorias() {
@@ -135,6 +157,22 @@ public class Libro {
 
     public void setEstado(String estado) {
         this.estado = estado;
+    }
+
+    public String getSituacion() {
+        return situacion;
+    }
+
+    public void setSituacion(String situacion) {
+        this.situacion = situacion;
+    }
+
+    public String getEstadoLogico() {
+        return estadoLogico;
+    }
+
+    public void setEstadoLogico(String estadoLogico) {
+        this.estadoLogico = estadoLogico;
     }
 
     public String getUbicacion() {

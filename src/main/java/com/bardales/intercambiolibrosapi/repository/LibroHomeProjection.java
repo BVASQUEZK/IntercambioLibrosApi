@@ -6,6 +6,7 @@ public interface LibroHomeProjection {
     String getTitulo();
     String getAutor();
     String getUrl_portada();
+    String getSituacion();
     String getDistrito();
     String getDepartamento();
 }

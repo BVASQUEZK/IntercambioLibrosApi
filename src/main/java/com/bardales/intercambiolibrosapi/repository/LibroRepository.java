@@ -1,6 +1,7 @@
 package com.bardales.intercambiolibrosapi.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -12,7 +13,7 @@ import com.bardales.intercambiolibrosapi.entity.Libro;
 public interface LibroRepository extends JpaRepository<Libro, Integer> {
 
     @Query(value = "SELECT l.id_libro AS id_libro, l.id_usuario AS id_usuario, "
-            + "l.titulo AS titulo, l.autor AS autor, img.url_imagen AS url_portada, "
+            + "l.titulo AS titulo, l.autor AS autor, img.url_imagen AS url_portada, l.situacion AS situacion, "
             + "uo.direccion AS distrito, uo.ciudad AS departamento "
             +
             "FROM libro l "
@@ -27,12 +28,14 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             + "ORDER BY ux.fecha_actualizacion DESC NULLS LAST, ux.id_ubicacion DESC "
             + "LIMIT 1 "
             + ") uo ON TRUE "
+            +
+            "WHERE COALESCE(l.estado_logico, 'activo') = 'activo' "
             +
             "ORDER BY l.fecha_registro DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
     List<LibroHomeProjection> listarRecientes(@Param("limit") int limit, @Param("offset") int offset);
 
     @Query(value = "SELECT l.id_libro AS id_libro, l.id_usuario AS id_usuario, "
-            + "l.titulo AS titulo, l.autor AS autor, img.url_imagen AS url_portada, "
+            + "l.titulo AS titulo, l.autor AS autor, img.url_imagen AS url_portada, l.situacion AS situacion, "
             + "uo.direccion AS distrito, uo.ciudad AS departamento "
             +
             "FROM libro l "
@@ -42,14 +45,14 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             "LEFT JOIN imagen_libro img ON img.id_imagen = img_min.id_imagen "
             +
             "LEFT JOIN LATERAL ( "
-            + "SELECT ux.direccion, ux.ciudad FROM ubicacion ux "
+            + "SELECT ux.direccion, ux.ciudad, ux.latitud, ux.longitud FROM ubicacion ux "
             + "WHERE ux.id_usuario = l.id_usuario "
             + "ORDER BY ux.fecha_actualizacion DESC NULLS LAST, ux.id_ubicacion DESC "
             + "LIMIT 1 "
             + ") uo ON TRUE "
             +
             "LEFT JOIN LATERAL ( "
-            + "SELECT ux.direccion, ux.ciudad FROM ubicacion ux "
+            + "SELECT ux.direccion, ux.ciudad, ux.latitud, ux.longitud FROM ubicacion ux "
             + "WHERE ux.id_usuario = :idUsuario "
             + "ORDER BY ux.fecha_actualizacion DESC NULLS LAST, ux.id_ubicacion DESC "
             + "LIMIT 1 "
@@ -65,23 +68,45 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             +
             "AND (:estado IS NULL OR l.estado = :estado) "
             +
+            "AND COALESCE(l.estado_logico, 'activo') = 'activo' "
+            +
             "AND (:idUsuario IS NULL OR l.id_usuario <> :idUsuario) "
             +
             "AND ("
-            + ":alcance <> 'local' "
-            + "OR :idUsuario IS NULL "
+            + ":idUsuario IS NULL "
+            + "OR :alcance IN ('internacional', 'amplia') "
             + "OR uu.ciudad IS NULL "
             + "OR ("
-            + "uo.ciudad IS NOT NULL AND LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) "
+            + ":alcance = 'nacional' "
+            + "AND uo.ciudad IS NOT NULL "
+            + "AND LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad))"
+            + ") "
+            + "OR ("
+            + ":alcance = 'local' "
+            + "AND uo.ciudad IS NOT NULL "
+            + "AND LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) "
             + "AND ("
             + "COALESCE(NULLIF(TRIM(uu.direccion), ''), '') = '' "
             + "OR COALESCE(NULLIF(TRIM(uo.direccion), ''), '') = '' "
             + "OR LOWER(TRIM(uu.direccion)) = LOWER(TRIM(uo.direccion))"
             + ")"
-            + ")"
+            + ") "
             + ") "
             +
-            "ORDER BY l.fecha_registro DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+            "ORDER BY "
+            + "CASE "
+            + "WHEN :idUsuario IS NULL OR uu.ciudad IS NULL OR uo.ciudad IS NULL THEN 2 "
+            + "WHEN LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) "
+            + "AND COALESCE(NULLIF(TRIM(uu.direccion), ''), '') <> '' "
+            + "AND COALESCE(NULLIF(TRIM(uo.direccion), ''), '') <> '' "
+            + "AND LOWER(TRIM(uu.direccion)) = LOWER(TRIM(uo.direccion)) THEN 0 "
+            + "WHEN LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) THEN 1 "
+            + "ELSE 2 END ASC, "
+            + "CASE "
+            + "WHEN :idUsuario IS NULL THEN NULL "
+            + "WHEN uu.latitud IS NULL OR uu.longitud IS NULL OR uo.latitud IS NULL OR uo.longitud IS NULL THEN NULL "
+            + "ELSE POWER(uu.latitud - uo.latitud, 2) + POWER(uu.longitud - uo.longitud, 2) END ASC NULLS LAST, "
+            + "l.fecha_registro DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
     List<LibroHomeProjection> buscarLibros(
             @Param("titulo") String titulo,
             @Param("autor") String autor,
@@ -93,7 +118,7 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             @Param("offset") int offset);
 
     @Query(value = "SELECT l.id_libro AS id_libro, l.id_usuario AS id_usuario, "
-            + "l.titulo AS titulo, l.autor AS autor, img.url_imagen AS url_portada, "
+            + "l.titulo AS titulo, l.autor AS autor, img.url_imagen AS url_portada, l.situacion AS situacion, "
             + "uo.direccion AS distrito, uo.ciudad AS departamento "
             +
             "FROM libro l "
@@ -103,14 +128,14 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             "LEFT JOIN imagen_libro img ON img.id_imagen = img_min.id_imagen "
             +
             "LEFT JOIN LATERAL ( "
-            + "SELECT ux.direccion, ux.ciudad FROM ubicacion ux "
+            + "SELECT ux.direccion, ux.ciudad, ux.latitud, ux.longitud FROM ubicacion ux "
             + "WHERE ux.id_usuario = l.id_usuario "
             + "ORDER BY ux.fecha_actualizacion DESC NULLS LAST, ux.id_ubicacion DESC "
             + "LIMIT 1 "
             + ") uo ON TRUE "
             +
             "LEFT JOIN LATERAL ( "
-            + "SELECT ux.direccion, ux.ciudad FROM ubicacion ux "
+            + "SELECT ux.direccion, ux.ciudad, ux.latitud, ux.longitud FROM ubicacion ux "
             + "WHERE ux.id_usuario = :idUsuario "
             + "ORDER BY ux.fecha_actualizacion DESC NULLS LAST, ux.id_ubicacion DESC "
             + "LIMIT 1 "
@@ -124,23 +149,45 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
             +
             "AND (:estado IS NULL OR l.estado = :estado) "
             +
+            "AND COALESCE(l.estado_logico, 'activo') = 'activo' "
+            +
             "AND (:idUsuario IS NULL OR l.id_usuario <> :idUsuario) "
             +
             "AND ("
-            + ":alcance <> 'local' "
-            + "OR :idUsuario IS NULL "
+            + ":idUsuario IS NULL "
+            + "OR :alcance IN ('internacional', 'amplia') "
             + "OR uu.ciudad IS NULL "
             + "OR ("
-            + "uo.ciudad IS NOT NULL AND LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) "
+            + ":alcance = 'nacional' "
+            + "AND uo.ciudad IS NOT NULL "
+            + "AND LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad))"
+            + ") "
+            + "OR ("
+            + ":alcance = 'local' "
+            + "AND uo.ciudad IS NOT NULL "
+            + "AND LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) "
             + "AND ("
             + "COALESCE(NULLIF(TRIM(uu.direccion), ''), '') = '' "
             + "OR COALESCE(NULLIF(TRIM(uo.direccion), ''), '') = '' "
             + "OR LOWER(TRIM(uu.direccion)) = LOWER(TRIM(uo.direccion))"
             + ")"
-            + ")"
+            + ") "
             + ") "
             +
-            "ORDER BY l.fecha_registro DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+            "ORDER BY "
+            + "CASE "
+            + "WHEN :idUsuario IS NULL OR uu.ciudad IS NULL OR uo.ciudad IS NULL THEN 2 "
+            + "WHEN LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) "
+            + "AND COALESCE(NULLIF(TRIM(uu.direccion), ''), '') <> '' "
+            + "AND COALESCE(NULLIF(TRIM(uo.direccion), ''), '') <> '' "
+            + "AND LOWER(TRIM(uu.direccion)) = LOWER(TRIM(uo.direccion)) THEN 0 "
+            + "WHEN LOWER(TRIM(uu.ciudad)) = LOWER(TRIM(uo.ciudad)) THEN 1 "
+            + "ELSE 2 END ASC, "
+            + "CASE "
+            + "WHEN :idUsuario IS NULL THEN NULL "
+            + "WHEN uu.latitud IS NULL OR uu.longitud IS NULL OR uo.latitud IS NULL OR uo.longitud IS NULL THEN NULL "
+            + "ELSE POWER(uu.latitud - uo.latitud, 2) + POWER(uu.longitud - uo.longitud, 2) END ASC NULLS LAST, "
+            + "l.fecha_registro DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
     List<LibroHomeProjection> buscarLibrosLegacy(
             @Param("titulo") String titulo,
             @Param("autor") String autor,
@@ -158,4 +205,14 @@ public interface LibroRepository extends JpaRepository<Libro, Integer> {
     @Modifying
     @Query(value = "INSERT INTO libro_categoria (id_libro, id_categoria) VALUES (:idLibro, :idCategoria) ON CONFLICT DO NOTHING", nativeQuery = true)
     void vincularCategoria(@Param("idLibro") Integer idLibro, @Param("idCategoria") Integer idCategoria);
+
+    Optional<Libro> findByIdLibroAndIdUsuario(Integer idLibro, Integer idUsuario);
+
+    @Modifying
+    @Query(value = "DELETE FROM imagen_libro WHERE id_libro = :idLibro", nativeQuery = true)
+    void eliminarImagenesPorLibro(@Param("idLibro") Integer idLibro);
+
+    @Modifying
+    @Query(value = "DELETE FROM libro_categoria WHERE id_libro = :idLibro", nativeQuery = true)
+    void eliminarCategoriasPorLibro(@Param("idLibro") Integer idLibro);
 }

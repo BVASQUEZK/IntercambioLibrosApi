@@ -16,6 +16,7 @@ public class LibroDTO {
     @NotBlank
     private String urlPortada;
 
+    private String situacion;
     private Integer idUsuario;
     private String distrito;
     private String departamento;
@@ -23,11 +24,12 @@ public class LibroDTO {
     public LibroDTO() {
     }
 
-    public LibroDTO(Integer idLibro, String titulo, String autor, String urlPortada) {
+    public LibroDTO(Integer idLibro, String titulo, String autor, String urlPortada, String situacion) {
         this.idLibro = idLibro;
         this.titulo = titulo;
         this.autor = autor;
         this.urlPortada = urlPortada;
+        this.situacion = situacion;
     }
 
     public LibroDTO(
@@ -35,6 +37,7 @@ public class LibroDTO {
             String titulo,
             String autor,
             String urlPortada,
+            String situacion,
             Integer idUsuario,
             String distrito,
             String departamento) {
@@ -42,6 +45,7 @@ public class LibroDTO {
         this.titulo = titulo;
         this.autor = autor;
         this.urlPortada = urlPortada;
+        this.situacion = situacion;
         this.idUsuario = idUsuario;
         this.distrito = distrito;
         this.departamento = departamento;
@@ -77,6 +81,14 @@ public class LibroDTO {
 
     public void setUrlPortada(String urlPortada) {
         this.urlPortada = urlPortada;
+    }
+
+    public String getSituacion() {
+        return situacion;
+    }
+
+    public void setSituacion(String situacion) {
+        this.situacion = situacion;
     }
 
     public Integer getIdUsuario() {

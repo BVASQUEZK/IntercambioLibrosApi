@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,8 @@ import com.bardales.intercambiolibrosapi.service.SolicitudService;
 
 @Service
 public class SolicitudServiceImpl implements SolicitudService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SolicitudServiceImpl.class);
 
     private final SolicitudRepository solicitudRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -97,17 +102,60 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitudRepository.actualizarEstado(idSolicitud, nuevoEstado);
 
         if ("aceptado".equals(nuevoEstado)) {
-            jdbcTemplate.update(
-                    "UPDATE libro l SET disponible = FALSE "
-                            + "FROM detalle_solicitud ds "
-                            + "WHERE ds.id_solicitud = ? AND ds.id_libro = l.id_libro",
-                    idSolicitud);
+            marcarLibrosComoOcupados(idSolicitud);
         }
 
         if ("finalizado".equals(nuevoEstado)) {
+            marcarLibrosComoOcupados(idSolicitud);
+            actualizarEncuentroRealizado(idSolicitud);
+        }
+
+        if ("cancelado".equals(nuevoEstado) && "aceptado".equals(estadoActual)) {
+            liberarLibrosDeSolicitud(idSolicitud);
+        }
+    }
+
+    private void marcarLibrosComoOcupados(int idSolicitud) {
+        jdbcTemplate.update(
+                "UPDATE libro l SET disponible = FALSE, situacion = 'ocupado' "
+                        + "FROM detalle_solicitud ds "
+                        + "WHERE ds.id_solicitud = ? AND ds.id_libro = l.id_libro",
+                idSolicitud);
+    }
+
+    private void liberarLibrosDeSolicitud(int idSolicitud) {
+        jdbcTemplate.update(
+                "UPDATE libro l SET disponible = TRUE, situacion = 'disponible' "
+                        + "FROM detalle_solicitud ds "
+                        + "WHERE ds.id_solicitud = ? AND ds.id_libro = l.id_libro "
+                        + "AND COALESCE(l.estado_logico, 'activo') = 'activo'",
+                idSolicitud);
+    }
+
+    private void actualizarEncuentroRealizado(int idSolicitud) {
+        if (!existeTabla("encuentro")) {
+            return;
+        }
+        try {
             jdbcTemplate.update(
                     "UPDATE encuentro SET estado = 'realizado' WHERE id_solicitud = ? AND estado <> 'cancelado'",
                     idSolicitud);
+        } catch (DataAccessException ex) {
+            LOGGER.warn("No se pudo actualizar encuentro para solicitud {}: {}", idSolicitud, ex.getMessage());
+        }
+    }
+
+    private boolean existeTabla(String tableName) {
+        try {
+            Integer total = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM information_schema.tables "
+                            + "WHERE table_schema = current_schema() AND table_name = ?",
+                    Integer.class,
+                    tableName);
+            return total != null && total > 0;
+        } catch (DataAccessException ex) {
+            LOGGER.warn("No se pudo validar existencia de tabla {}: {}", tableName, ex.getMessage());
+            return false;
         }
     }
 
