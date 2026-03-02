@@ -86,7 +86,7 @@ CREATE TABLE libro_categoria (
 CREATE TABLE imagen_libro (
     id_imagen SERIAL PRIMARY KEY,
     id_libro INT NOT NULL REFERENCES libro(id_libro),
-    url_imagen VARCHAR(500)
+    url_imagen TEXT
 );
 
 -- =========================================

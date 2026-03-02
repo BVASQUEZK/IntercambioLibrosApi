@@ -47,8 +47,9 @@ public class LibroServiceImpl implements LibroService {
                             + "SELECT l.id_libro, l.id_categoria FROM libro l "
                             + "WHERE l.id_categoria IS NOT NULL "
                             + "ON CONFLICT DO NOTHING");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS imagen_libro ALTER COLUMN url_imagen TYPE TEXT");
         } catch (Exception ex) {
-            LOGGER.warn("No se pudo inicializar libro_categoria automaticamente: {}", ex.getMessage());
+            LOGGER.warn("No se pudieron aplicar ajustes de esquema de libros automaticamente: {}", ex.getMessage());
         }
     }
 
