@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import com.bardales.intercambiolibrosapi.repository.IntercambioJpaRepository;
 import com.bardales.intercambiolibrosapi.repository.IntercambioMensajeProjection;
 import com.bardales.intercambiolibrosapi.repository.IntercambioSolicitudProjection;
 import com.bardales.intercambiolibrosapi.repository.LibroRepository;
+import com.bardales.intercambiolibrosapi.repository.UsuarioRepository;
 import com.bardales.intercambiolibrosapi.service.IntercambioService;
 
 @Service
@@ -27,22 +30,32 @@ public class IntercambioServiceImpl implements IntercambioService {
 
     private final IntercambioJpaRepository intercambioRepository;
     private final LibroRepository libroRepository;
+    private final UsuarioRepository usuarioRepository;
     private final JdbcTemplate jdbcTemplate;
 
     public IntercambioServiceImpl(IntercambioJpaRepository intercambioRepository, LibroRepository libroRepository,
-            JdbcTemplate jdbcTemplate) {
+            UsuarioRepository usuarioRepository, JdbcTemplate jdbcTemplate) {
         this.intercambioRepository = intercambioRepository;
         this.libroRepository = libroRepository;
+        this.usuarioRepository = usuarioRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     @Transactional
     public Integer enviarSolicitud(int idUsuarioSolicitante, IntercambioSolicitudDTO dto) {
+        if (idUsuarioSolicitante <= 0 || !usuarioRepository.existsById(idUsuarioSolicitante)) {
+            throw new UnauthorizedException("Sesion invalida. Vuelve a iniciar sesion");
+        }
+
         Libro libro = libroRepository.findById(dto.getIdLibroInteresado())
                 .orElseThrow(() -> new ResourceNotFoundException("Libro no encontrado"));
+        Integer idReceptor = libro.getIdUsuario();
+        if (idReceptor == null || idReceptor <= 0 || !usuarioRepository.existsById(idReceptor)) {
+            throw new ResourceNotFoundException("No se encontro al propietario del libro");
+        }
 
-        if (libro.getIdUsuario() != null && libro.getIdUsuario().equals(idUsuarioSolicitante)) {
+        if (idReceptor.equals(idUsuarioSolicitante)) {
             throw new UnauthorizedException("No puedes solicitar tu propio libro");
         }
 
@@ -55,13 +68,12 @@ public class IntercambioServiceImpl implements IntercambioService {
 
         Optional<Integer> solicitudExistente = buscarSolicitudActiva(
                 idUsuarioSolicitante,
-                libro.getIdUsuario(),
+                idReceptor,
                 dto.getIdLibroInteresado());
-        Integer idSolicitud = solicitudExistente.orElseGet(() -> jdbcTemplate.queryForObject(
-                "INSERT INTO solicitud (id_solicitante, id_receptor, tipo, estado) VALUES (?, ?, 'intercambio', 'pendiente') RETURNING id_solicitud",
-                Integer.class,
+        Integer idSolicitud = solicitudExistente.orElseGet(() -> crearSolicitudSegura(
                 idUsuarioSolicitante,
-                libro.getIdUsuario()));
+                idReceptor,
+                dto.getIdLibroInteresado()));
 
         if (idSolicitud == null || idSolicitud <= 0) {
             throw new RuntimeException("No se pudo crear la solicitud de intercambio");
@@ -80,6 +92,30 @@ public class IntercambioServiceImpl implements IntercambioService {
         }
 
         return idSolicitud;
+    }
+
+    private Integer crearSolicitudSegura(int idSolicitante, int idReceptor, int idLibroReceptor) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "INSERT INTO solicitud (id_solicitante, id_receptor, tipo, estado) VALUES (?, ?, 'intercambio', 'pendiente') RETURNING id_solicitud",
+                    Integer.class,
+                    idSolicitante,
+                    idReceptor);
+        } catch (DataIntegrityViolationException ex) {
+            if (!usuarioRepository.existsById(idSolicitante)) {
+                throw new UnauthorizedException("Sesion invalida. Vuelve a iniciar sesion");
+            }
+            if (!usuarioRepository.existsById(idReceptor)) {
+                throw new ResourceNotFoundException("No se encontro al propietario del libro");
+            }
+            throw ex;
+        } catch (DataAccessException ex) {
+            Optional<Integer> existente = buscarSolicitudActiva(idSolicitante, idReceptor, idLibroReceptor);
+            if (existente.isPresent()) {
+                return existente.get();
+            }
+            throw ex;
+        }
     }
 
     private Optional<Integer> buscarSolicitudActiva(int idSolicitante, int idReceptor, int idLibroReceptor) {
