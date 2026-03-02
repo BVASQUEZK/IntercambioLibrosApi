@@ -45,11 +45,23 @@ public class Usuario {
     @Column(name = "fecha_registro", updatable = false)
     private LocalDateTime fechaRegistro;
 
+    @Column(name = "puntos")
+    private Integer puntos;
+
     public Usuario() {
     }
 
-    public Usuario(Integer idUsuario, String nombres, String apellidos, String dni, String correo, String telefono,
-            String password, String urlFotoPerfil, LocalDateTime fechaRegistro) {
+    public Usuario(
+            Integer idUsuario,
+            String nombres,
+            String apellidos,
+            String dni,
+            String correo,
+            String telefono,
+            String password,
+            String urlFotoPerfil,
+            LocalDateTime fechaRegistro,
+            Integer puntos) {
         this.idUsuario = idUsuario;
         this.nombres = nombres;
         this.apellidos = apellidos;
@@ -59,6 +71,7 @@ public class Usuario {
         this.password = password;
         this.urlFotoPerfil = urlFotoPerfil;
         this.fechaRegistro = fechaRegistro;
+        this.puntos = puntos;
     }
 
     public Integer getIdUsuario() {
@@ -131,5 +144,13 @@ public class Usuario {
 
     public void setFechaRegistro(LocalDateTime fechaRegistro) {
         this.fechaRegistro = fechaRegistro;
+    }
+
+    public Integer getPuntos() {
+        return puntos;
+    }
+
+    public void setPuntos(Integer puntos) {
+        this.puntos = puntos;
     }
 }

@@ -22,6 +22,7 @@ import com.bardales.intercambiolibrosapi.dto.LibroHomeDTO;
 import com.bardales.intercambiolibrosapi.dto.LibroRegistroDTO;
 import com.bardales.intercambiolibrosapi.entity.Libro;
 import com.bardales.intercambiolibrosapi.exception.ResourceNotFoundException;
+import com.bardales.intercambiolibrosapi.exception.UnauthorizedException;
 import com.bardales.intercambiolibrosapi.repository.LibroHomeProjection;
 import com.bardales.intercambiolibrosapi.repository.LibroRepository;
 import com.bardales.intercambiolibrosapi.service.LibroService;
@@ -169,6 +170,14 @@ public class LibroServiceImpl implements LibroService {
         String condicionNormalizada = normalizarCondicion(dto.getCondicion());
         String situacionNormalizada = normalizarSituacion(dto.getSituacion());
         boolean disponible = esDisponible(situacionNormalizada);
+
+        int puntosConsumidos = jdbcTemplate.update(
+                "UPDATE usuario SET puntos = COALESCE(puntos, 0) - 1 "
+                        + "WHERE id_usuario = ? AND COALESCE(puntos, 0) > 0",
+                idUsuario);
+        if (puntosConsumidos == 0) {
+            throw new UnauthorizedException("No tienes puntos suficientes. Mira un anuncio para ganar 1 punto.");
+        }
 
         List<Integer> categorias = normalizarCategorias(dto.getIdCategorias(), dto.getIdCategoria());
         if (categorias.isEmpty()) {

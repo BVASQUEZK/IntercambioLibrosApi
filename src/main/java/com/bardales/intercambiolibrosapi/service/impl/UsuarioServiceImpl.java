@@ -10,6 +10,7 @@ import com.bardales.intercambiolibrosapi.exception.UnauthorizedException;
 import com.bardales.intercambiolibrosapi.repository.UsuarioRepository;
 import com.bardales.intercambiolibrosapi.service.UsuarioService;
 
+import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,17 @@ public class UsuarioServiceImpl implements UsuarioService {
     public UsuarioServiceImpl(UsuarioRepository usuarioRepository, JdbcTemplate jdbcTemplate) {
         this.usuarioRepository = usuarioRepository;
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @PostConstruct
+    void inicializarPuntosUsuario() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS usuario ADD COLUMN IF NOT EXISTS puntos INT");
+            jdbcTemplate.execute("ALTER TABLE IF EXISTS usuario ALTER COLUMN puntos SET DEFAULT 1");
+            jdbcTemplate.update("UPDATE usuario SET puntos = 1 WHERE puntos IS NULL OR puntos < 0");
+        } catch (Exception ignored) {
+            // Si falla este ajuste, el flujo normal devolvera error y se corrige en despliegue DB.
+        }
     }
 
     @Override
@@ -75,7 +87,8 @@ public class UsuarioServiceImpl implements UsuarioService {
                 toDouble(ubicacion.get("latitud")),
                 toDouble(ubicacion.get("longitud")),
                 toStringOrNull(ubicacion.get("distrito")),
-                toStringOrNull(ubicacion.get("departamento")));
+                toStringOrNull(ubicacion.get("departamento")),
+                usuario.getPuntos() == null ? 0 : usuario.getPuntos());
     }
 
     @Override
@@ -115,6 +128,22 @@ public class UsuarioServiceImpl implements UsuarioService {
             urlFoto = "default_user.png";
         }
         return new LoginResponseDTO(usuario.getNombres(), usuario.getApellidos(), urlFoto);
+    }
+
+    @Override
+    @Transactional
+    public Integer sumarPuntoPorAnuncio(int idUsuarioHeader) {
+        int updated = jdbcTemplate.update(
+                "UPDATE usuario SET puntos = COALESCE(puntos, 0) + 1 WHERE id_usuario = ?",
+                idUsuarioHeader);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Usuario no encontrado");
+        }
+        Integer puntos = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(puntos, 0) FROM usuario WHERE id_usuario = ?",
+                Integer.class,
+                idUsuarioHeader);
+        return puntos == null ? 0 : puntos;
     }
 
     private Map<String, Object> obtenerUbicacionPerfil(int idUsuario) {
@@ -200,7 +229,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     public Map<String, Object> registrarUsuario(String nombres, String apellidos, String correo, String clave, String dni) {
         try {
             Integer idUsuario = jdbcTemplate.queryForObject(
-                    "INSERT INTO usuario (nombres, apellidos, correo, password, dni) VALUES (?, ?, ?, ?, ?) RETURNING id_usuario",
+                    "INSERT INTO usuario (nombres, apellidos, correo, password, dni, puntos) VALUES (?, ?, ?, ?, ?, 1) RETURNING id_usuario",
                     Integer.class,
                     nombres, apellidos, correo, clave, dni);
 

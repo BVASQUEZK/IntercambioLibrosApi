@@ -12,6 +12,7 @@ public class PerfilUsuarioDTO {
     private Double longitud;
     private String distrito;
     private String departamento;
+    private Integer puntos;
 
     public PerfilUsuarioDTO() {
     }
@@ -23,6 +24,7 @@ public class PerfilUsuarioDTO {
         this.urlFotoPerfil = urlFotoPerfil;
         this.fechaRegistro = fechaRegistro;
         this.promedioPuntuacion = promedioPuntuacion;
+        this.puntos = 0;
     }
 
     public PerfilUsuarioDTO(
@@ -34,7 +36,8 @@ public class PerfilUsuarioDTO {
             Double latitud,
             Double longitud,
             String distrito,
-            String departamento) {
+            String departamento,
+            Integer puntos) {
         this.nombres = nombres;
         this.apellidos = apellidos;
         this.urlFotoPerfil = urlFotoPerfil;
@@ -44,6 +47,7 @@ public class PerfilUsuarioDTO {
         this.longitud = longitud;
         this.distrito = distrito;
         this.departamento = departamento;
+        this.puntos = puntos;
     }
 
     public String getNombres() {
@@ -116,5 +120,13 @@ public class PerfilUsuarioDTO {
 
     public void setDepartamento(String departamento) {
         this.departamento = departamento;
+    }
+
+    public Integer getPuntos() {
+        return puntos;
+    }
+
+    public void setPuntos(Integer puntos) {
+        this.puntos = puntos;
     }
 }

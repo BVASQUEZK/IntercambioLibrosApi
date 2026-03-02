@@ -1,8 +1,11 @@
 package com.bardales.intercambiolibrosapi.controller;
 
+import java.util.Map;
+
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -42,5 +45,11 @@ public class UsuarioController {
             @RequestHeader("X-User-Id") int idUsuario,
             @Valid @RequestBody UsuarioUpdateDTO dto) {
         return usuarioService.actualizarPerfil(idUsuario, dto);
+    }
+
+    @PostMapping("/puntos/anuncio")
+    public Map<String, Object> sumarPuntoPorAnuncio(@RequestHeader("X-User-Id") int idUsuario) {
+        Integer puntos = usuarioService.sumarPuntoPorAnuncio(idUsuario);
+        return Map.of("mensaje", "Punto agregado", "puntos", puntos);
     }
 }
