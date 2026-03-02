@@ -23,6 +23,7 @@ public class MensajeServiceImpl implements MensajeService {
     }
 
     @Override
+    @Transactional
     public List<MensajeDTO> listarMensajes(int idSolicitud, int idUsuario) {
         validarParticipante(idSolicitud, idUsuario);
         mensajeRepository.marcarMensajesLeidos(idSolicitud, idUsuario);
