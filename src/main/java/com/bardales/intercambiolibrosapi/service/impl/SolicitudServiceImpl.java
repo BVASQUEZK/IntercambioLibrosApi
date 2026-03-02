@@ -88,6 +88,9 @@ public class SolicitudServiceImpl implements SolicitudService {
                 throw new UnauthorizedException("Solo se puede responder una solicitud pendiente");
             }
         } else if ("finalizado".equals(nuevoEstado)) {
+            if (idUsuario != idReceptor) {
+                throw new ForbiddenException("Solo el dueño del libro puede finalizar");
+            }
             if (!"aceptado".equals(estadoActual)) {
                 throw new UnauthorizedException("Solo se puede finalizar una solicitud aceptada");
             }
@@ -106,7 +109,7 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
 
         if ("finalizado".equals(nuevoEstado)) {
-            marcarLibrosComoOcupados(idSolicitud);
+            liberarLibrosDeSolicitud(idSolicitud);
             actualizarEncuentroRealizado(idSolicitud);
         }
 
@@ -128,7 +131,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                 "UPDATE libro l SET disponible = TRUE, situacion = 'disponible' "
                         + "FROM detalle_solicitud ds "
                         + "WHERE ds.id_solicitud = ? AND ds.id_libro = l.id_libro "
-                        + "AND COALESCE(l.estado_logico, 'activo') = 'activo'",
+                        + "AND COALESCE(l.estado, 'activo') = 'activo'",
                 idSolicitud);
     }
 
